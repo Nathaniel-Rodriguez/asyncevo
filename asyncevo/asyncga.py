@@ -18,3 +18,11 @@ class AsyncGa:
                  cooling_factor: float = 1.0,
                  annealing_cut_off_step: int = -1):
         self._population_lineage = []
+
+    def run(self, num_iterations: int):
+        """
+
+        :param num_iterations:
+        :return:
+        """
+        pass
