@@ -1,22 +1,26 @@
+__all__ = ['Member', 'RandNumTable']
+
+
 from numpy import np
+from asyncevo.distribution import Distribution
 
 
 class Member:
     """
 
     """
-    def __init__(self, member_size):
+    def __init__(self, initializing_distribution: Distribution):
         """
 
         """
-        pass
+        self._initializing_distribution = initializing_distribution
 
 
-class RandNumTableMixin:
+class RandNumTable:
     """
 
     """
-    def __init__(self, table_size, seed):
+    def __init__(self, table_size: int, seed: int):
         """
 
         :param table_size:
