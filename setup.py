@@ -11,5 +11,5 @@ setup(name='asyncevo',
           'numpy>=1.18.1',  # likely compatible with earlier versions.
           # sphinx?
       ],
-      python_requires='>=3',
+      python_requires='>=3.7',
       include_package_data=True)
