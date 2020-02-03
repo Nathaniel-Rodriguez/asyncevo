@@ -1,35 +1,37 @@
-__all__ = ['Scheduler']
-
-
-from typing import Dict
-
-
-def initialize_member(member_cls, member_parameters: Dict):
-    """
-
-    :param member_cls:
-    :param member_parameters:
-    :return:
-    """
-
-    return member_cls(**member_parameters)
+__all__ = ['Scheduler', 'scheduler']
 
 
 class Scheduler:
     """
 
     """
-    def __init__(self, num_workers: int,
-                 num_threads_per_worker: int = 1):
+    def __init__(self):
         """
 
         """
-        pass
+        from dask_mpi import initialize
+        initialize()
+        # Rank 0 is initialized with scheduler
+        # Rank 1 will pass through and execute following code
+        # Rank 2+ will execute workers
 
-    def initialize_population(self, member_cls, member_parameters):
+        from distributed import Client
+        self._client = Client()
+
+    @property
+    def client(self):
+        return self._client
+
+    @client.setter
+    def client(self, value):
+        raise NotImplementedError
+
+    def num_workers(self):
         """
 
-        :param member_cls:
-        :param member_parameters:
         :return:
         """
+        return len(self._client.scheduler_info()['workers'])
+
+
+scheduler = Scheduler()
