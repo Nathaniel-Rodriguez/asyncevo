@@ -7,7 +7,7 @@ from typing import Union
 from typing import Any
 
 
-def load(filename: Union[Path, str]):
+def load(filename: Union[Path, str]) -> Any:
     """
 
     :param filename:

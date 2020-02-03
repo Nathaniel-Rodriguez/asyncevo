@@ -1,22 +1,15 @@
-__all__ = ['Lineage', 'GaLineage']
+__all__ = ['Lineage']
 
 
 from dataclasses import dataclass
 from typing import List
 
 
+# lineage needs to be a tree of seeds for crossover
+# at each node on tree it needs a corresponding sigma
 @dataclass
 class Lineage:
     """
 
     """
-    seeds: List[int]
-
-
-@dataclass
-class GaLineage(Lineage):
-    """
-
-    """
-    sigmas: List[float]
-    crossover_steps: List[int]
+    seeds: List[int]  # change to tree
