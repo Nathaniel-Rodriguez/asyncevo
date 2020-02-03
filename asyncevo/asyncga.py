@@ -3,6 +3,7 @@ __all__ = ['AsyncGa']
 
 from asyncevo import Scheduler
 from asyncevo import Distribution
+from asyncevo import Lineage
 from typing import Dict
 
 
@@ -38,7 +39,8 @@ class AsyncGa:
         self._crossover_probability = crossover_probability
         self._cooling_factor = cooling_factor
         self._annealing_cut_off = annealing_cut_off
-        self._population_lineage = []
+        self._population_lineages = []
+        self._population_fitnesses = []
 
     def run(self, num_iterations: int, lineages=None):
         """
@@ -59,3 +61,42 @@ class AsyncGa:
                 # submit new work
                 # increment steps
             # update lineages -> save to file
+
+    # probably do this:
+    # pick lineage at random
+    # lazy mutate -> new lineage
+    # roll for crossover
+    # if crossover
+    #   pick second lineage at random
+    #   lazy crossover -> new lineage (only 1 child)
+    # dispatch new lineage
+    def crossover(self,
+                  seed: int,
+                  first_parent_lineage: Lineage,
+                  second_parent_lineage: Lineage) -> Lineage:
+        """
+        Single offspring crossover meant to replace the worst parent.
+        :param seed:
+        :param first_parent_lineage:
+        :param second_parent_lineage:
+        :return: lineage for offspring
+        """
+        pass
+
+    def _selection(self):
+        """
+        Pick lineage at random
+        :return:
+        """
+
+    def _replacement(self):
+        """
+        Do replace worst or replace parent(s)
+        :return:
+        """
+        pass
+    # need a replacement algorithm, with no duplicated
+    # so either check == of two lineages
+    # crowing is another option but requires check distance instantiated
+    # parameters, and is more costly to
+    # generate the agents locally to repeatedly to calculate Manhattan Distance
