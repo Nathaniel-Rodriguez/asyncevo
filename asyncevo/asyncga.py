@@ -3,6 +3,18 @@ __all__ = ['AsyncGa']
 
 from asyncevo import Scheduler
 from asyncevo import Distribution
+from typing import Dict
+
+
+def initialize_member(member_cls, member_parameters: Dict):
+    """
+
+    :param member_cls:
+    :param member_parameters:
+    :return:
+    """
+
+    return member_cls(**member_parameters)
 
 
 class AsyncGa:
