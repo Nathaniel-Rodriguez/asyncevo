@@ -15,5 +15,5 @@ setup(name='asyncevo',
           'dask-mpi>=2.0.0'
           # sphinx?
       ],
-      python_requires='>=3.7',
+      python_requires='>=3.6',
       include_package_data=True)
