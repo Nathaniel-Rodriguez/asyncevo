@@ -2,5 +2,5 @@ from asyncevo.member import *
 from asyncevo.lineage import *
 from asyncevo.asyncga import *
 from asyncevo.scheduler import *
-from asyncevo.distribution import *
 from asyncevo.utilities import *
+from asyncevo.sliceops import *
