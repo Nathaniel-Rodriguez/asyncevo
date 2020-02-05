@@ -9,17 +9,18 @@ from typing import List
 from asyncevo import Scheduler
 from asyncevo import Lineage
 from asyncevo import Member
+from asyncevo import manhattan_distance
 
 
-def initialize_member(member_cls, member_parameters: Dict):
-    """
+def initialize_member(member_parameters: Dict):
+    return Member(**member_parameters)
 
-    :param member_cls:
-    :param member_parameters:
-    :return:
-    """
 
-    return member_cls(**member_parameters)
+def dispatch_work(fitness_function, lineage: Lineage, member: Member):
+    # probably need to bring in fitness function... parameters in order
+    # to generate the games here... maybe with a class or something.
+    member.appropriate_lineage(lineage)
+    return fitness_function(member.parameters), lineage
 
 
 class AsyncGa:
@@ -68,8 +69,13 @@ class AsyncGa:
         self._max_table_step = max_table_step
         self._population = self._initialize()
         self._rng = Random(self._global_seed)
-        self._member_buffer1 = Member()
-        self._member_buffer2 = Member()
+        self._table_seed = self._make_seed()
+        self._member_parameters = {'initial_state': self._initial_state,
+                                   'table_seed': self._table_seed,
+                                   'table_size': self._table_size,
+                                   'max_table_step': self._max_table_step}
+        self._member_buffer1 = Member(**self._member_parameters)
+        self._member_buffer2 = Member(**self._member_parameters)
 
     def run(self, num_iterations: int):
         """
@@ -102,7 +108,7 @@ class AsyncGa:
         Generates the initial population of lineages with None fitness values.
         :return: a list of dictionaries with keys 'lineage' and 'fitness'
         """
-        return [{'lineage': Lineage([self._make_seed()], [self._sigma])}
+        return [{'lineage': Lineage(self._make_seed(), self._sigma)}
                 for _ in range(self._population_size)]
 
     def _selection(self) -> Lineage:
@@ -131,24 +137,20 @@ class AsyncGa:
         replace that neighbor in the population.
         """
         pass
+        # crowding is another option but requires check distance instantiated
+        # parameters, and is more costly to
+        # generate the agents locally to repeatedly to calculate Manhattan Distance
+        # HOWEVER, the master isn't really doing a whole lot after submissions
+        # it could keep a PxP table w/ manhattan distances between members
+        # that it generates. Whenever a new member is introduced, its distance
+        # would need to be calculated against all other members. So all the other
+        # members would need to be recreated. But this is done anyway in ES
+        # with crowding you still only replace if it has better fitness
+        # in crowding you replace the member closest to you in space if
+        # your fitness is higher
 
     def _anneal(self):
         """
         Applies annealing to sigma.
         """
         self._sigma = 0  # calc new sigma here, based on self._step
-
-    # need a replacement algorithm, with no duplicated
-    # so either check == of two lineages
-
-    # crowding is another option but requires check distance instantiated
-    # parameters, and is more costly to
-    # generate the agents locally to repeatedly to calculate Manhattan Distance
-    # HOWEVER, the master isn't really doing a whole lot after submissions
-    # it could keep a PxP table w/ manhattan distances between members
-    # that it generates. Whenever a new member is introduced, its distance
-    # would need to be calculated against all other members. So all the other
-    # members would need to be recreated. But this is done anyway in ES
-    # with crowding you still only replace if it has better fitness
-    # in crowding you replace the member closest to you in space if
-    # your fitness is higher

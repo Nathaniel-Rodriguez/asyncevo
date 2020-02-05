@@ -23,7 +23,8 @@ class Member:
         :param table_size: the size of the random number table.
         :param max_table_step: the maximum random stride for table slices
         """
-        self._x = initial_state
+        self._initial_state = initial_state
+        self._x = np.copy(initial_state)
         self._mutation = np.zeros(len(self._x), dtype=AsyncGa.dtype)
         self._rng = np.random.RandomState(table_seed)
         self._table = self._rng.randn(table_size)
@@ -31,11 +32,20 @@ class Member:
         self._has_lineage = False
         self._lineage = None
 
+    @property
+    def parameters(self):
+        return self._x
+
+    @parameters.setter
+    def parameters(self, value):
+        raise NotImplementedError
+
     def appropriate_lineage(self, lineage: Lineage):
         """
         Take on a lineage and explicitly express its parameters.
         :param lineage: a lineage to appropriate.
         """
+        self._x[:] = self._initial_state[:]
         self._lineage = lineage
         self._has_lineage = True
         for mutation in self._lineage:
