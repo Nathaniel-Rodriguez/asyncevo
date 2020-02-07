@@ -28,7 +28,8 @@ def initialize_member(member_type, member_parameters: Dict) -> Member:
 def dispatch_work(fitness_function: Callable[[np.ndarray, ...], float],
                   lineage: Lineage,
                   member: Member,
-                  fitness_kwargs=None) -> Tuple[float, Lineage]:
+                  member_id: int,
+                  fitness_kwargs=None) -> Tuple[float, Lineage, int]:
     """
     Sends out work to a member and returns a tuple of the fitness and its
     associated lineage. The lineage is returned so that dispatch_work can
@@ -37,6 +38,7 @@ def dispatch_work(fitness_function: Callable[[np.ndarray, ...], float],
     numpy array and returns a fitness value.
     :param lineage: the lineage for the member to use to generate parameters.
     :param member: an initialized member.
+    :param member_id: id of the member.
     :param fitness_kwargs: additional arguments for the fitness function
     :return: fitness
     """
@@ -44,7 +46,7 @@ def dispatch_work(fitness_function: Callable[[np.ndarray, ...], float],
         fitness_kwargs = {}
 
     member.appropriate_lineage(lineage)
-    return fitness_function(member.parameters, **fitness_kwargs), lineage
+    return fitness_function(member.parameters, **fitness_kwargs), lineage, member_id
 
 
 class AsyncGa:
@@ -129,13 +131,14 @@ class AsyncGa:
         members = self._scheduler.client.map(initialize_member,
             [self._member_type for _ in self._scheduler.num_workers()],
             member_parameters=self._member_parameters)
+        member_ids = [i for i in range(len(members))]
 
         # create initial batch
         initial_batch = []
         for i, member in enumerate(members):
             initial_batch.append(self._scheduler.client.submit(
                 dispatch_work, fitness_function, self._population[i]['lineage'],
-                member, **fitness_kwargs))
+                member, member_ids[i], **fitness_kwargs))
         # TODO: need to put in rest of population
 
         working_batch = Scheduler.as_completed(initial_batch)
@@ -146,9 +149,9 @@ class AsyncGa:
                 new_lineage = self._mutation(self._selection())
                 working_batch.add(self._scheduler.client.submit(
                     dispatch_work, fitness_function, new_lineage,
-                    member, **fitness_kwargs))  # TODO: figure out which member to give
+                    members[result[2]], result[2], **fitness_kwargs))
                 self._step += 1
-                
+
         # TODO: update lineages -> save to file
 
     def _make_seed(self) -> int:
