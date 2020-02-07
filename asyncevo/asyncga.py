@@ -13,6 +13,8 @@ from asyncevo import Scheduler
 from asyncevo import Lineage
 from asyncevo import Member
 from asyncevo import manhattan_distance
+from asyncevo import split_work
+from asyncevo import save
 
 
 def initialize_member(member_type, member_parameters: Dict) -> Member:
@@ -68,7 +70,8 @@ class AsyncGa:
                  annealing_stop: int = inf,
                  table_size: int = 20000000,
                  max_table_step: int = 5,
-                 member_type=Member):
+                 member_type=Member,
+                 save_filename="test.ga"):
         """
         :param initial_state: a numpy array with the initial parameter guess.
         :param population_size: the desired size of the evolutionary population.
@@ -104,6 +107,8 @@ class AsyncGa:
         self._annealing_stop = annealing_stop
         self._table_size = table_size
         self._max_table_step = max_table_step
+        self._save_filename = save_filename
+
         self._population = self._initialize()
         self._rng = Random(self._global_seed)
         self._table_seed = self._make_seed()
@@ -127,32 +132,42 @@ class AsyncGa:
         if fitness_kwargs is None:
             fitness_kwargs = {}
 
-        # generate members on each worker
-        members = self._scheduler.client.map(initialize_member,
-            [self._member_type for _ in self._scheduler.num_workers()],
-            member_parameters=self._member_parameters)
-        member_ids = [i for i in range(len(members))]
+        # distribute members for each worker
+        num_workers = self._scheduler.num_workers()
+        workers = self._scheduler.get_worker_names()
+        members = [self._scheduler.client.submit(initialize_member,
+                                                 self._member_type,
+                                                 self._member_parameters,
+                                                 workers=[worker])
+                   for worker in workers]
 
         # create initial batch
-        initial_batch = []
-        for i, member in enumerate(members):
-            initial_batch.append(self._scheduler.client.submit(
-                dispatch_work, fitness_function, self._population[i]['lineage'],
-                member, member_ids[i], **fitness_kwargs))
-        # TODO: need to put in rest of population
+        initial_batch = [
+            self._scheduler.client.submit(
+                dispatch_work,
+                fitness_function,
+                self._population[pop]['lineage'],
+                members[i], i, **fitness_kwargs,
+                workers=[workers[i]])
+            for i, pop_group in enumerate(
+                split_work(list(range(self._population_size)), num_workers))
+            for pop in pop_group]
 
+        # iterate ga until num_iterations reached
         working_batch = Scheduler.as_completed(initial_batch)
-        for result in working_batch:
-            self._replacement(result[1], result[0])
+        for completed_job in working_batch:
+            fitness, lineage, index = completed_job.result()
+            self._replacement(lineage, fitness)
             if self._step < num_iterations:
                 self._anneal()
                 new_lineage = self._mutation(self._selection())
                 working_batch.add(self._scheduler.client.submit(
                     dispatch_work, fitness_function, new_lineage,
-                    members[result[2]], result[2], **fitness_kwargs))
+                    members[index], index, **fitness_kwargs,
+                    workers=[workers[index]]))
                 self._step += 1
 
-        # TODO: update lineages -> save to file
+        # TODO: decide how to save, self or just population?
 
     def _make_seed(self) -> int:
         """

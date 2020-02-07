@@ -1,11 +1,24 @@
-__all__ = ['load', 'save', 'manhattan_distance']
+__all__ = ['load', 'save', 'manhattan_distance', 'split_work']
 
 
 import pickle
 from pathlib import Path
 from typing import Union
 from typing import Any
+from typing import List
+from typing import Generator
 import numpy as np
+
+
+def split_work(work: List[Any], num_batches: int) -> Generator[List[Any], None, None]:
+    """
+    Divides a list of work into evenly (as best as possible) sub batches.
+    :param work: a list of work
+    :param num_batches: the number of sublists to split it into
+    :return: a generator that return lists
+    """
+    for i in range(0, len(work), num_batches):
+        yield work[i:i + num_batches]
 
 
 def manhattan_distance(a: np.ndarray, b: np.ndarray) -> float:
