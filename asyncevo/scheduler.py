@@ -1,14 +1,15 @@
-__all__ = ['Scheduler', 'scheduler']
+__all__ = ['Scheduler']
 
 
 class Scheduler:
     """
-
+    A wrapper around dask-mpi.
     """
     def __init__(self):
         """
-
+        Creating a scheduler initializes dask MPI
         """
+
         from dask_mpi import initialize
         initialize()
         # Rank 0 is initialized with scheduler
@@ -28,10 +29,11 @@ class Scheduler:
 
     def num_workers(self):
         """
-
-        :return:
+        :return: the number of known workers.
         """
         return len(self._client.scheduler_info()['workers'])
 
-
-scheduler = Scheduler()
+    @staticmethod
+    def as_completed(*args, **kwargs):
+        from distributed import as_completed
+        return as_completed(*args, **kwargs)
