@@ -1,3 +1,6 @@
+from typing import List
+
+
 __all__ = ['Scheduler']
 
 
@@ -27,11 +30,17 @@ class Scheduler:
     def client(self, value):
         raise NotImplementedError
 
-    def num_workers(self):
+    def num_workers(self) -> int:
         """
         :return: the number of known workers.
         """
         return len(self._client.scheduler_info()['workers'])
+
+    def get_worker_names(self) -> List[str]:
+        """
+        :return: return list of worker names
+        """
+        return list(self._client.scheduler_info()['workers'].keys())
 
     @staticmethod
     def as_completed(*args, **kwargs):
