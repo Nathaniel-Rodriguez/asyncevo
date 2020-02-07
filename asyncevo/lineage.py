@@ -23,3 +23,14 @@ class Lineage(Sequence):
 
     def __len__(self):
         return len(self._lineage)
+
+    def __eq__(self, other):
+        if len(other) != len(self):
+            return False
+
+        for i in range(len(self)):
+            if not (self[i]['seed'] == other[i]['seed']
+                    and self[i]['sigma'] == other[i]['sigma']):
+                return False
+
+        return True
