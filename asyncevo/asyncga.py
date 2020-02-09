@@ -49,7 +49,8 @@ def dispatch_work(fitness_function: Callable[[np.ndarray, ...], float],
         fitness_kwargs = {}
 
     member.appropriate_lineage(lineage)
-    return fitness_function(member.parameters, **fitness_kwargs), lineage, member_id
+    return fitness_function(member.parameters, **fitness_kwargs),\
+           lineage, member_id
 
 
 class AsyncGa:
@@ -72,7 +73,7 @@ class AsyncGa:
                  table_size: int = 20000000,
                  max_table_step: int = 5,
                  member_type=Member,
-                 save_filename="test.ga"):
+                 save_filename: Path = None):
         """
         :param initial_state: a numpy array with the initial parameter guess.
         :param population_size: the desired size of the evolutionary population.
@@ -91,6 +92,7 @@ class AsyncGa:
             must be able to consume and forward all of Member's arguments to it.
             One reason to subclass Member is to keep additional information
             stored on workers over the duration of the run.
+        :param save_filename: a filename or path to save the output to.
         """
         if (cooling_factor < 0) or (cooling_factor > 1):
             raise AssertionError("Invalid input: Cooling factor must be"
@@ -110,6 +112,7 @@ class AsyncGa:
         self._max_table_step = max_table_step
         self._save_filename = save_filename
 
+        self._fitness_history = []
         self._population = self._initialize()
         self._rng = Random(self._global_seed)
         self._table_seed = self._make_seed()
@@ -123,8 +126,7 @@ class AsyncGa:
 
     def run(self, fitness_function: Callable[[np.ndarray, ...], float],
             num_iterations: int,
-            fitness_kwargs=None,
-            filename: Path=None):
+            fitness_kwargs: Dict = None):
         """
         Executes the genetic algorithm.
         :param fitness_function: a function that returns the fitness of a lineage
@@ -169,9 +171,10 @@ class AsyncGa:
                     members[index], index, **fitness_kwargs,
                     workers=[workers[index]]))
                 self._step += 1
+                self._update_fitness_history()
 
-        if filename is not None:
-            self.save_population(filename)
+        if self._save_filename is not None:
+            self.save_population(self._save_filename)
 
     def _make_seed(self) -> int:
         """
@@ -216,7 +219,6 @@ class AsyncGa:
         :param lineage: a new lineage to check for replacement
         :param fitness: fitness of lineage
         """
-
         is_weakest = True
         for pop in self._population:
             if (pop['fitness'] is not None) and (pop['fitness'] > fitness):
@@ -252,11 +254,19 @@ class AsyncGa:
            and (self._step < self._annealing_stop):
             self._sigma = self._sigma0 * (self._cooling_factor ** self._step)
 
+    def _update_fitness_history(self):
+        """
+        Updates the internal record of fitness for the population.
+        """
+        self._fitness_history.append([pop['fitness']
+                                      for pop in self._population])
+
     def save_population(self, filename: Path):
         """
         Saves the current population to file along with all necessary parameters
         required for re-creating the base Member class that generates the
-        parameter vector. The data is saved as a pickled Python object.
+        parameter vector. Also included is the whole history of fitness values
+        in the population. The data is saved as a pickled Python object.
         Compatible versions of Numpy should be used as Numpy objects are also
         pickled. The data layout is follows:
 
@@ -265,7 +275,8 @@ class AsyncGa:
              'initial_state': np.ndarray,
              'table_seed': int,
              'table_size': int,
-             'max_table_step': int
+             'max_table_step': int,
+             'history': List[List['fitness]]
              }
 
         :param filename: a file path
@@ -275,5 +286,6 @@ class AsyncGa:
             'initial_state': self._initial_state,
             'table_seed': self._table_seed,
             'table_size': self._table_size,
-            'max_table_step': self._max_table_step
+            'max_table_step': self._max_table_step,
+            'history': self._fitness_history
         }, filename)
