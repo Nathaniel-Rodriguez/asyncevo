@@ -29,7 +29,7 @@ def initialize_member(member_type, member_parameters: Dict) -> Member:
     return member_type(**member_parameters)
 
 
-def dispatch_work(fitness_function: Callable[[np.ndarray, ...], float],
+def dispatch_work(fitness_function: Callable[[np.ndarray], float],
                   lineage: Lineage,
                   member: Member,
                   member_id: int,
@@ -114,8 +114,8 @@ class AsyncGa:
         self._save_filename = save_filename
 
         self._fitness_history = []
-        self._population = self._initialize()
         self._rng = Random(self._global_seed)
+        self._population = self._initialize()
         self._table_seed = self._make_seed()
         self._member_type = member_type
         self._member_parameters = {'initial_state': self._initial_state,
@@ -125,7 +125,7 @@ class AsyncGa:
         self._member_buffer1 = Member(**self._member_parameters)
         self._member_buffer2 = Member(**self._member_parameters)
 
-    def run(self, fitness_function: Callable[[np.ndarray, ...], float],
+    def run(self, fitness_function: Callable[[np.ndarray], float],
             num_iterations: int,
             fitness_kwargs: Dict = None):
         """
