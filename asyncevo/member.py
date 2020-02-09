@@ -1,10 +1,10 @@
 __all__ = ['Member']
 
 
-from numpy import np
-from asyncevo.asyncga import AsyncGa
+import numpy as np
 from asyncevo.lineage import Lineage
 from asyncevo.sliceops import *
+from asyncevo import DEFAULT_TYPE
 
 
 class Member:
@@ -16,7 +16,7 @@ class Member:
     lineage at a given time.
     """
     def __init__(self, initial_state: np.ndarray, table_seed: int,
-                 table_size: int, max_table_step: int):
+                 table_size: int, max_table_step: int, dtype=DEFAULT_TYPE):
         """
         :param initial_state: a numpy array from which to generate perturbations.
         :param table_seed: the seed for generating the random number table.
@@ -25,7 +25,7 @@ class Member:
         """
         self._initial_state = initial_state
         self._x = np.copy(initial_state)
-        self._mutation = np.zeros(len(self._x), dtype=AsyncGa.dtype)
+        self._mutation = np.zeros(len(self._x), dtype=dtype)
         self._rng = np.random.RandomState(table_seed)
         self._table = self._rng.randn(table_size)
         self._max_table_step = max_table_step

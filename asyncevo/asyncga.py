@@ -16,6 +16,7 @@ from asyncevo import Member
 from asyncevo import manhattan_distance
 from asyncevo import split_work
 from asyncevo import save
+from asyncevo import DEFAULT_TYPE
 
 
 def initialize_member(member_type, member_parameters: Dict) -> Member:
@@ -59,7 +60,7 @@ class AsyncGa:
     and crowding replacement. An exponential annealing schedule is used to
     change the mutation size over time.
     """
-    dtype = np.float32  # a single numpy type is used for all arrays
+    dtype = DEFAULT_TYPE  # a single numpy type is used for all arrays
 
     def __init__(self,
                  initial_state: np.ndarray,

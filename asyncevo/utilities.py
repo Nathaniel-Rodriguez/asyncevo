@@ -1,4 +1,4 @@
-__all__ = ['load', 'save', 'manhattan_distance', 'split_work']
+__all__ = ['load', 'save', 'manhattan_distance', 'split_work', 'DEFAULT_TYPE']
 
 
 import pickle
@@ -8,6 +8,9 @@ from typing import Any
 from typing import List
 from typing import Generator
 import numpy as np
+
+
+DEFAULT_TYPE = np.float32
 
 
 def split_work(work: List[Any], num_batches: int) -> Generator[List[Any], None, None]:
