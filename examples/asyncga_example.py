@@ -1,3 +1,6 @@
+# run this example with:
+# <mpi command> -n <number cores> python asyncga_example.py
+
 # Initialize the MPI process
 # all code following this code will be executed on rank 1
 # rank 0 is dedicated to the scheduler
