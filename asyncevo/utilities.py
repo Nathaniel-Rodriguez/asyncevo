@@ -20,8 +20,7 @@ def split_work(work: List[Any], num_batches: int) -> Generator[List[Any], None, 
     :param num_batches: the number of sublists to split it into
     :return: a generator that return lists
     """
-    for i in range(0, len(work), num_batches):
-        yield work[i:i + num_batches]
+    return (work[index::num_batches] for index in range(num_batches))
 
 
 def manhattan_distance(a: np.ndarray, b: np.ndarray) -> float:
