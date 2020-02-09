@@ -4,6 +4,7 @@ __all__ = ['AsyncGa']
 import numpy as np
 from math import inf
 from copy import deepcopy
+from pathlib import Path
 from random import Random
 from typing import Dict
 from typing import List
@@ -122,12 +123,14 @@ class AsyncGa:
 
     def run(self, fitness_function: Callable[[np.ndarray, ...], float],
             num_iterations: int,
-            fitness_kwargs=None):
+            fitness_kwargs=None,
+            filename: Path=None):
         """
         Executes the genetic algorithm.
         :param fitness_function: a function that returns the fitness of a lineage
         :param num_iterations: the number of steps to run.
-        :param fitness_kwargs: any key word arguments for fitness_function
+        :param fitness_kwargs: any key word arguments for fitness_function.
+        :param filename: an output filename.
         """
         if fitness_kwargs is None:
             fitness_kwargs = {}
@@ -167,7 +170,8 @@ class AsyncGa:
                     workers=[workers[index]]))
                 self._step += 1
 
-        # TODO: decide how to save, self or just population?
+        if filename is not None:
+            self.save_population(filename)
 
     def _make_seed(self) -> int:
         """
@@ -236,7 +240,7 @@ class AsyncGa:
                     closest_distance = distance
                     closest_member_index = i
 
-        if self._population[closest_member_index]['fitess'] < fitness:
+        if self._population[closest_member_index]['fitness'] < fitness:
             self._population[closest_member_index] = {'lineage': lineage,
                                                       'fitness': fitness}
 
@@ -247,3 +251,29 @@ class AsyncGa:
         if (self._step > self._annealing_start) \
            and (self._step < self._annealing_stop):
             self._sigma = self._sigma0 * (self._cooling_factor ** self._step)
+
+    def save_population(self, filename: Path):
+        """
+        Saves the current population to file along with all necessary parameters
+        required for re-creating the base Member class that generates the
+        parameter vector. The data is saved as a pickled Python object.
+        Compatible versions of Numpy should be used as Numpy objects are also
+        pickled. The data layout is follows:
+
+            {
+             'population': List[{'lineage': Lineage, 'fitness': float}],
+             'initial_state': np.ndarray,
+             'table_seed': int,
+             'table_size': int,
+             'max_table_step': int
+             }
+
+        :param filename: a file path
+        """
+        save({
+            'population': self._population,
+            'initial_state': self._initial_state,
+            'table_seed': self._table_seed,
+            'table_size': self._table_size,
+            'max_table_step': self._max_table_step
+        }, filename)
