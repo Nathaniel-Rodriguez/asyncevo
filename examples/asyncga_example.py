@@ -43,7 +43,8 @@ def rest(x):
 
 
 def main():
-    ga = AsyncGa(initial_state=np.random.randn(10),
+    rng = np.random.RandomState(232)
+    ga = AsyncGa(initial_state=rng.randn(10),
                  population_size=20,
                  scheduler=initialize.mpi_scheduler,
                  global_seed=21048,
