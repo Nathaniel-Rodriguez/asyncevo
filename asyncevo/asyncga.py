@@ -33,7 +33,8 @@ def dispatch_work(fitness_function: Callable[[np.ndarray], float],
                   lineage: Lineage,
                   member: Member,
                   member_id: int,
-                  fitness_kwargs=None) -> Tuple[float, Lineage, int]:
+                  fitness_kwargs: Dict = None,
+                  is_initial: bool = False) -> Tuple[float, Lineage, int, bool]:
     """
     Sends out work to a member and returns a tuple of the fitness and its
     associated lineage. The lineage is returned so that dispatch_work can
@@ -43,6 +44,7 @@ def dispatch_work(fitness_function: Callable[[np.ndarray], float],
     :param lineage: the lineage for the member to use to generate parameters.
     :param member: an initialized member.
     :param member_id: id of the member.
+    :param is_initial: specifies whether it is part of the initial dispatch
     :param fitness_kwargs: additional arguments for the fitness function
     :return: fitness
     """
@@ -51,7 +53,7 @@ def dispatch_work(fitness_function: Callable[[np.ndarray], float],
 
     member.appropriate_lineage(lineage)
     return fitness_function(member.parameters, **fitness_kwargs),\
-           lineage, member_id
+           lineage, member_id, is_initial
 
 
 class AsyncGa:
@@ -133,7 +135,6 @@ class AsyncGa:
         :param fitness_function: a function that returns the fitness of a lineage
         :param num_iterations: the number of steps to run.
         :param fitness_kwargs: any key word arguments for fitness_function.
-        :param filename: an output filename.
         """
         if fitness_kwargs is None:
             fitness_kwargs = {}
@@ -153,7 +154,7 @@ class AsyncGa:
                 dispatch_work,
                 fitness_function,
                 self._population[pop]['lineage'],
-                members[i], i, **fitness_kwargs,
+                members[i], i, fitness_kwargs, True,
                 workers=[workers[i]])
             for i, pop_group in enumerate(
                 split_work(list(range(self._population_size)), num_workers))
@@ -162,17 +163,21 @@ class AsyncGa:
         # iterate ga until num_iterations reached
         working_batch = Scheduler.as_completed(initial_batch)
         for completed_job in working_batch:
-            fitness, lineage, index = completed_job.result()
-            self._replacement(lineage, fitness)
+            fitness, lineage, index, is_initial = completed_job.result()
+            if is_initial:
+                self._set_initial(lineage, fitness)
+            else:
+                self._replacement(lineage, fitness)
+
+            self._update_fitness_history()
             if self._step < num_iterations:
                 self._anneal()
                 new_lineage = self._mutation(self._selection())
                 working_batch.add(self._scheduler.client.submit(
                     dispatch_work, fitness_function, new_lineage,
-                    members[index], index, **fitness_kwargs,
+                    members[index], index, fitness_kwargs,
                     workers=[workers[index]]))
                 self._step += 1
-                self._update_fitness_history()
 
         if self._save_filename is not None:
             self.save_population(self._save_filename)
@@ -255,12 +260,28 @@ class AsyncGa:
            and (self._step < self._annealing_stop):
             self._sigma = self._sigma0 * (self._cooling_factor ** self._step)
 
+    def _set_initial(self, lineage: Lineage, fitness: float):
+        """
+        Helps initialize the population with its first members.
+        :param lineage: a lineage
+        :param fitness: a fitness
+        """
+        is_set = False
+        for pop in self._population:
+            if pop['lineage'] == lineage:
+                pop['fitness'] = fitness
+                is_set = True
+
+        if not is_set:
+            raise ValueError("Lineage from initial batch not set.")
+
     def _update_fitness_history(self):
         """
         Updates the internal record of fitness for the population.
         """
         self._fitness_history.append([pop['fitness']
-                                      for pop in self._population])
+                                      for pop in self._population
+                                      if pop['fitness'] is not None])
 
     def save_population(self, filename: Path):
         """
