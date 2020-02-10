@@ -20,7 +20,7 @@ class Scheduler:
         # Rank 2+ will execute workers
 
         from distributed import Client
-        self._client = Client()
+        self._client = Client()  # TODO specify memory
 
     @property
     def client(self):
