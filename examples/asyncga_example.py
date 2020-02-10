@@ -11,6 +11,7 @@ import numpy as np
 from math import inf
 from asyncevo import Member
 from pathlib import Path
+from time import sleep
 
 
 # Below are available fitness functions
@@ -35,12 +36,18 @@ def rosenbrock(x):
                 for i in range(n-1))
 
 
+def rest(x):
+    """sleeps for a time and then returns sphere."""
+    sleep(np.random.randint(1, 3))
+    return sphere(x)
+
+
 def main():
     ga = AsyncGa(initial_state=np.random.randn(10),
                  population_size=20,
                  scheduler=initialize.mpi_scheduler,
                  global_seed=21048,
-                 sigma=1.1,
+                 sigma=0.01,
                  cooling_factor=1.0,
                  annealing_start=0,
                  annealing_stop=inf,
@@ -48,7 +55,7 @@ def main():
                  max_table_step=2,
                  member_type=Member,
                  save_filename=Path("test.asyncga"))
-    ga.run(sphere, 10)
+    ga.run(sphere, 5000)
 
 
 if __name__ == "__main__":
