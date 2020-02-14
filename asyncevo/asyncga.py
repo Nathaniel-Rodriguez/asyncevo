@@ -115,6 +115,10 @@ class AsyncGa:
         self._max_table_step = max_table_step
         self._save_filename = save_filename
 
+        self._cost_rank_sum = self._population_size \
+                              * (self._population_size + 1) / 2
+        self._selection_probabilities = [self._linearly_scaled_member_rank(i)
+                                         for i in range(self._population_size)]
         self._fitness_history = []
         self._rng = Random(self._global_seed)
         self._population = self._initialize()
@@ -203,7 +207,8 @@ class AsyncGa:
         Pick lineage at random from population.
         :return: a lineage.
         """
-        return self._rng.choice(self._population)['lineage']
+        # return self._rng.choice(self._population)['lineage']
+
 
     def _mutation(self, lineage: Lineage) -> Lineage:
         """
@@ -287,6 +292,37 @@ class AsyncGa:
         self._fitness_history.append([pop['fitness']
                                       for pop in self._population
                                       if pop['fitness'] is not None])
+
+    def _linearly_scaled_member_rank(self, cost_index):
+        """
+        Scales the rank of an individual (cost_index)
+        :param cost_index: 1 is best
+        :return: scaled_cost_rank
+        """
+        return (self._population_size - cost_index) / self._cost_rank_sum
+
+    def _fitness_proportionate_selection(self, rng, sorted_ranks):
+        """
+        Implements stochastic universal sampling and returns a list of
+        selected ranks and is the same size as the population. There can be
+        duplicate ranks which get selected more than once.
+
+        Implements SUS. Enforces elitism.
+        :param rng: a random number generator from which to determine the
+            selected individuals
+        :param sorted_ranks: a np.array of ranks that match the selection
+            probabilities. These should be sorted from least->greatest cost.
+        :return: the selected member index
+        """
+
+        rv = rng.rand()
+        for i in range(self._population_size):
+            count += self._num_expected_copies[i]
+            while rv < count:
+                rv += 1
+                selected.append(sorted_ranks[i])
+
+        return selected
 
     def save_population(self, filename: Path):
         """
