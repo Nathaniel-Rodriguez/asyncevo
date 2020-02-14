@@ -225,14 +225,19 @@ class AsyncGa:
         :param lineage: a new lineage to check for replacement
         :param fitness: fitness of lineage
         """
+        # We can skip replacement if the new lineage is weaker than all
+        # other population members
         is_weakest = True
         for pop in self._population:
-            if (pop['fitness'] is not None) and (pop['fitness'] > fitness):
+            if (pop['fitness'] is not None) and (pop['fitness'] < fitness):
                 is_weakest = False
+                break
 
         if is_weakest:
             return
 
+        # Check the lineage's manhattan distance from all population members
+        # and replace the closest one IF it is better.
         self._member_buffer1.appropriate_lineage(lineage)
         closest_member_index = None
         closest_distance = None
