@@ -186,6 +186,14 @@ class AsyncGa:
         if self._save_filename is not None:
             self.save_population(self._save_filename)
 
+    def _fitness_sorted_indices(self) -> np.ndarray:
+        """
+        :return: an array of pop indices sorted by greatest fitness to least
+        """
+        return np.flip(np.argsort([pop['fitness']
+                                   if pop['fitness'] is not None else -np.inf
+                                   for pop in self._population]))
+
     def _make_seed(self) -> int:
         """
         Generates a new seed from the master rng.
@@ -204,11 +212,12 @@ class AsyncGa:
 
     def _selection(self) -> Lineage:
         """
-        Pick lineage at random from population.
+        Pick lineage at random from population based on ranked fitness
         :return: a lineage.
         """
+        return self._population[self._rng.choice(self._fitness_sorted_indices(),
+                                p=self._selection_probabilities)]['lineage']
         # return self._rng.choice(self._population)['lineage']
-
 
     def _mutation(self, lineage: Lineage) -> Lineage:
         """
@@ -300,29 +309,6 @@ class AsyncGa:
         :return: scaled_cost_rank
         """
         return (self._population_size - cost_index) / self._cost_rank_sum
-
-    def _fitness_proportionate_selection(self, rng, sorted_ranks):
-        """
-        Implements stochastic universal sampling and returns a list of
-        selected ranks and is the same size as the population. There can be
-        duplicate ranks which get selected more than once.
-
-        Implements SUS. Enforces elitism.
-        :param rng: a random number generator from which to determine the
-            selected individuals
-        :param sorted_ranks: a np.array of ranks that match the selection
-            probabilities. These should be sorted from least->greatest cost.
-        :return: the selected member index
-        """
-
-        rv = rng.rand()
-        for i in range(self._population_size):
-            count += self._num_expected_copies[i]
-            while rv < count:
-                rv += 1
-                selected.append(sorted_ranks[i])
-
-        return selected
 
     def save_population(self, filename: Path):
         """
