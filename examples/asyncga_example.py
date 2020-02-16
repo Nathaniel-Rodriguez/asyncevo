@@ -36,6 +36,13 @@ def rosenbrock(x):
                 for i in range(n-1))
 
 
+def rosenbrock2d(x):
+    """
+    Best at f(1,1)=0
+    """
+    return -((1 - x[0])**2 + 100 * (x[1] - x[0]**2)**2)
+
+
 def rest(x):
     """sleeps for a time and then returns sphere."""
     sleep(np.random.randint(1, 3))
@@ -43,20 +50,19 @@ def rest(x):
 
 
 def main():
-    rng = np.random.RandomState(232)
-    ga = AsyncGa(initial_state=np.array([1, -1, 0, -1, 0, -0.5, 0.3, 0]),
+    ga = AsyncGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
                  population_size=20,
                  scheduler=initialize.mpi_scheduler,
-                 global_seed=21048,
-                 sigma=0.01,
-                 cooling_factor=1.0,
+                 global_seed=96879,
+                 sigma=1.0,
+                 cooling_factor=0.996,
                  annealing_start=0,
                  annealing_stop=inf,
                  table_size=20000,
                  max_table_step=2,
                  member_type=Member,
                  save_filename=Path("test.asyncga"))
-    ga.run(sphere, 5000)
+    ga.run(sphere, 3000)
 
 
 if __name__ == "__main__":
