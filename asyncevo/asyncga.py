@@ -215,9 +215,8 @@ class AsyncGa:
         Pick lineage at random from population based on ranked fitness
         :return: a lineage.
         """
-        return self._population[self._rng.choice(self._fitness_sorted_indices(),
-                                p=self._selection_probabilities)]['lineage']
-        # return self._rng.choice(self._population)['lineage']
+        return self._population[self._rng.choices(self._fitness_sorted_indices(),
+                                weights=self._selection_probabilities)[0]]['lineage']
 
     def _mutation(self, lineage: Lineage) -> Lineage:
         """
