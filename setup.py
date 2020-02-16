@@ -8,11 +8,10 @@ setup(name='asyncevo',
       packages=['asyncevo'],
       url='https://github.com/Nathaniel-Rodriguez/asyncevo.git',
       install_requires=[
-          'dask>=2.10.1<3',  # maybe more than 3 and less than 2.10
-          'distributed>=2.10.0<3',
-          'numpy>=1.18.1',  # likely compatible with earlier versions.
+          'dask>=2.2<3',
+          'distributed>=2.0<3',
+          'numpy>=1.10.0',
           'dask-mpi>=2.0.0<3'
-          # sphinx?
       ],
-      python_requires='>=3.6',
+      python_requires='>=3.5',
       include_package_data=True)
