@@ -145,12 +145,15 @@ class AsyncGa:
 
     def run(self, fitness_function: Callable[[np.ndarray], float],
             num_iterations: int,
-            fitness_kwargs: Dict = None):
+            fitness_kwargs: Dict = None,
+            take_member: bool = False):
         """
         Executes the genetic algorithm.
         :param fitness_function: a function that returns the fitness of a lineage
         :param num_iterations: the number of steps to run.
         :param fitness_kwargs: any key word arguments for fitness_function.
+        :param take_member: whether the fitness function requires the member to be
+        provided or not (if not then expects an array) (default: False).
         """
         if fitness_kwargs is None:
             fitness_kwargs = {}
@@ -170,7 +173,7 @@ class AsyncGa:
                 dispatch_work,
                 fitness_function,
                 self._population[pop]['lineage'],
-                members[i], i, fitness_kwargs, True,
+                members[i], i, fitness_kwargs, True, take_member,
                 workers=[workers[i]])
             for i, pop_group in enumerate(
                 split_work(list(range(self._population_size)), num_workers))
@@ -192,6 +195,7 @@ class AsyncGa:
                 working_batch.add(self._scheduler.client.submit(
                     dispatch_work, fitness_function, new_lineage,
                     members[index], index, fitness_kwargs,
+                    take_member=take_member,
                     workers=[workers[index]]))
                 self._step += 1
 
