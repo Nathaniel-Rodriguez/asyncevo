@@ -88,7 +88,7 @@ class AsyncGa:
                  table_size: int = 20000000,
                  max_table_step: int = 5,
                  member_type=Member,
-                 member_type_kwargs: Dict=None,
+                 member_type_kwargs: Dict = None,
                  save_filename: Path = None):
         """
         :param initial_state: a numpy array with the initial parameter guess.
