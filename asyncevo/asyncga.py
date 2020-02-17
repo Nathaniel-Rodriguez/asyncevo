@@ -88,6 +88,7 @@ class AsyncGa:
                  table_size: int = 20000000,
                  max_table_step: int = 5,
                  member_type=Member,
+                 member_type_kwargs: Dict=None,
                  save_filename: Path = None):
         """
         :param initial_state: a numpy array with the initial parameter guess.
@@ -107,8 +108,13 @@ class AsyncGa:
             must be able to consume and forward all of Member's arguments to it.
             One reason to subclass Member is to keep additional information
             stored on workers over the duration of the run.
+        :param member_type_kwargs: additional keyword arguments not related
+        to the base Member arguments.
         :param save_filename: a filename or path to save the output to.
         """
+        if member_type_kwargs is None:
+            member_type_kwargs = {}
+
         if (cooling_factor < 0) or (cooling_factor > 1):
             raise AssertionError("Invalid input: Cooling factor must be"
                                  " between 0 and 1.")
@@ -136,10 +142,12 @@ class AsyncGa:
         self._population = self._initialize()
         self._table_seed = self._make_seed()
         self._member_type = member_type
+        self._member_type_kwargs = member_type_kwargs
         self._member_parameters = {'initial_state': self._initial_state,
                                    'table_seed': self._table_seed,
                                    'table_size': self._table_size,
                                    'max_table_step': self._max_table_step}
+        self._member_type_kwargs.update(self._member_parameters)
         self._member_buffer1 = Member(**self._member_parameters)
         self._member_buffer2 = Member(**self._member_parameters)
 
@@ -163,7 +171,7 @@ class AsyncGa:
         workers = self._scheduler.get_worker_names()
         members = [self._scheduler.client.submit(initialize_member,
                                                  self._member_type,
-                                                 self._member_parameters,
+                                                 self._member_type_kwargs,
                                                  workers=[worker])
                    for worker in workers]
 
