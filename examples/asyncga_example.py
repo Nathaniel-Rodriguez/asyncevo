@@ -7,9 +7,9 @@
 # ranks 2+ are dedicated to workers
 from asyncevo import initialize
 from asyncevo import AsyncGa
+from asyncevo import Member
 import numpy as np
 from math import inf
-from asyncevo import Member
 from pathlib import Path
 from time import sleep
 
@@ -49,6 +49,10 @@ def rest(x):
     return sphere(x)
 
 
+def member_example(member):
+    return sphere(member.parameters)
+
+
 def main():
     ga = AsyncGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
                  population_size=20,
@@ -62,7 +66,7 @@ def main():
                  max_table_step=2,
                  member_type=Member,
                  save_filename=Path("test.asyncga"))
-    ga.run(sphere, 3000)
+    ga.run(member_example, 3000, take_member=True)
 
 
 if __name__ == "__main__":
