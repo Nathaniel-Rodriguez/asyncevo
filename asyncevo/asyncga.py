@@ -10,6 +10,7 @@ from typing import Dict
 from typing import List
 from typing import Tuple
 from typing import Callable
+from typing import Union
 from asyncevo import Scheduler
 from asyncevo import Lineage
 from asyncevo import Member
@@ -29,31 +30,42 @@ def initialize_member(member_type, member_parameters: Dict) -> Member:
     return member_type(**member_parameters)
 
 
-def dispatch_work(fitness_function: Callable[[np.ndarray], float],
+def dispatch_work(fitness_function: Union[Callable[[Member], float],
+                                          Callable[[np.ndarray], float]],
                   lineage: Lineage,
                   member: Member,
                   member_id: int,
                   fitness_kwargs: Dict = None,
-                  is_initial: bool = False) -> Tuple[float, Lineage, int, bool]:
+                  is_initial: bool = False,
+                  take_member: bool = False) -> Tuple[float, Lineage, int, bool]:
     """
     Sends out work to a member and returns a tuple of the fitness and its
     associated lineage. The lineage is returned so that dispatch_work can
     be used in an asynchronous scenario where
     :param fitness_function: a callable object that takes member parameters
-    numpy array and returns a fitness value.
+    numpy array and returns a fitness value. It can also be a callable
+    that takes as an argument a Member or subclass of Member and returns the
+    fitness.
     :param lineage: the lineage for the member to use to generate parameters.
     :param member: an initialized member.
     :param member_id: id of the member.
     :param is_initial: specifies whether it is part of the initial dispatch
     :param fitness_kwargs: additional arguments for the fitness function
-    :return: fitness
+    :param take_member: whether the fitness function requires the member to be
+    provided or not (if not then expects an array) (default: False).
+    :return: fitness, lineage, member id, and is_initial
     """
     if fitness_kwargs is None:
         fitness_kwargs = {}
 
     member.appropriate_lineage(lineage)
-    return fitness_function(member.parameters, **fitness_kwargs),\
-           lineage, member_id, is_initial
+    if take_member:
+        return fitness_function(member, **fitness_kwargs),\
+               lineage, member_id, is_initial
+
+    else:
+        return fitness_function(member.parameters, **fitness_kwargs),\
+               lineage, member_id, is_initial
 
 
 class AsyncGa:
@@ -76,6 +88,7 @@ class AsyncGa:
                  table_size: int = 20000000,
                  max_table_step: int = 5,
                  member_type=Member,
+                 member_type_kwargs: Dict = None,
                  save_filename: Path = None):
         """
         :param initial_state: a numpy array with the initial parameter guess.
@@ -95,8 +108,13 @@ class AsyncGa:
             must be able to consume and forward all of Member's arguments to it.
             One reason to subclass Member is to keep additional information
             stored on workers over the duration of the run.
+        :param member_type_kwargs: additional keyword arguments not related
+        to the base Member arguments.
         :param save_filename: a filename or path to save the output to.
         """
+        if member_type_kwargs is None:
+            member_type_kwargs = {}
+
         if (cooling_factor < 0) or (cooling_factor > 1):
             raise AssertionError("Invalid input: Cooling factor must be"
                                  " between 0 and 1.")
@@ -124,21 +142,26 @@ class AsyncGa:
         self._population = self._initialize()
         self._table_seed = self._make_seed()
         self._member_type = member_type
+        self._member_type_kwargs = member_type_kwargs
         self._member_parameters = {'initial_state': self._initial_state,
                                    'table_seed': self._table_seed,
                                    'table_size': self._table_size,
                                    'max_table_step': self._max_table_step}
+        self._member_type_kwargs.update(self._member_parameters)
         self._member_buffer1 = Member(**self._member_parameters)
         self._member_buffer2 = Member(**self._member_parameters)
 
     def run(self, fitness_function: Callable[[np.ndarray], float],
             num_iterations: int,
-            fitness_kwargs: Dict = None):
+            fitness_kwargs: Dict = None,
+            take_member: bool = False):
         """
         Executes the genetic algorithm.
         :param fitness_function: a function that returns the fitness of a lineage
         :param num_iterations: the number of steps to run.
         :param fitness_kwargs: any key word arguments for fitness_function.
+        :param take_member: whether the fitness function requires the member to be
+        provided or not (if not then expects an array) (default: False).
         """
         if fitness_kwargs is None:
             fitness_kwargs = {}
@@ -148,7 +171,7 @@ class AsyncGa:
         workers = self._scheduler.get_worker_names()
         members = [self._scheduler.client.submit(initialize_member,
                                                  self._member_type,
-                                                 self._member_parameters,
+                                                 self._member_type_kwargs,
                                                  workers=[worker])
                    for worker in workers]
 
@@ -158,7 +181,7 @@ class AsyncGa:
                 dispatch_work,
                 fitness_function,
                 self._population[pop]['lineage'],
-                members[i], i, fitness_kwargs, True,
+                members[i], i, fitness_kwargs, True, take_member,
                 workers=[workers[i]])
             for i, pop_group in enumerate(
                 split_work(list(range(self._population_size)), num_workers))
@@ -180,6 +203,7 @@ class AsyncGa:
                 working_batch.add(self._scheduler.client.submit(
                     dispatch_work, fitness_function, new_lineage,
                     members[index], index, fitness_kwargs,
+                    take_member=take_member,
                     workers=[workers[index]]))
                 self._step += 1
 
