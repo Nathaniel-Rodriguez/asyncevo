@@ -3,6 +3,7 @@ __all__ = ['Scheduler']
 
 from typing import List
 from typing import Dict
+from time import sleep
 from distributed import Client
 from distributed import as_completed
 
@@ -111,6 +112,14 @@ class Scheduler:
     @client.setter
     def client(self, value):
         raise NotImplementedError
+
+    def wait_on_workers(self):
+        """
+        Sleeps for a few seconds to wait for workers to connect. If time isn't
+        given then not all workers maybe accounted for by the time one of the
+        other methods is called.
+        """
+        sleep(5)
 
     def num_workers(self) -> int:
         """
