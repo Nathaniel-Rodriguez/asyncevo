@@ -210,7 +210,11 @@ class AsyncGa:
 
         # distribute members for each worker
         num_workers = self._scheduler.num_workers()
+        if num_workers == 0:
+            raise ValueError("Error: there are no workers.")
         workers = self._scheduler.get_worker_names()
+        if len(workers) == 0:
+            raise ValueError("Error: there are no workers.")
         members = [self._scheduler.client.submit(initialize_member,
                                                  self._member_type,
                                                  self._member_type_kwargs,
