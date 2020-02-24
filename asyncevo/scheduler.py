@@ -3,6 +3,8 @@ __all__ = ['Scheduler']
 
 from typing import List
 from typing import Dict
+from distributed import Client
+from distributed import as_completed
 
 
 class Scheduler:
@@ -25,9 +27,13 @@ class Scheduler:
         # Rank 0 is initialized with scheduler
         # Rank 1 will pass through and execute following code
         # Rank 2+ will execute workers
+        self._client = Client(**client_args)
 
-        from distributed import Client
-        self._client = Client(**client_args)  # TODO specify memory
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._client.shutdown()
 
     @property
     def client(self):
@@ -51,5 +57,4 @@ class Scheduler:
 
     @staticmethod
     def as_completed(*args, **kwargs):
-        from distributed import as_completed
         return as_completed(*args, **kwargs)
