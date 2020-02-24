@@ -65,8 +65,9 @@ def main():
                  table_size=20000,
                  max_table_step=2,
                  member_type=Member,
-                 save_filename=Path("test.asyncga"))
-    ga.run(member_example, 3000, take_member=True)
+                 save_filename=Path("test.asyncga"),
+                 save_every=100)
+    ga.run(member_example, 300, take_member=True)
 
 
 if __name__ == "__main__":
