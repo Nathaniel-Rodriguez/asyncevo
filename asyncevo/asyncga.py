@@ -36,7 +36,7 @@ def dispatch_work(fitness_function: Union[Callable[[Member], float],
                   member: Member,
                   member_id: int,
                   fitness_kwargs: Dict = None,
-                  take_member: bool = False) -> Tuple[float, Lineage, int, bool]:
+                  take_member: bool = False) -> Tuple[float, Lineage, int]:
     """
     Sends out work to a member and returns a tuple of the fitness and its
     associated lineage. The lineage is returned so that dispatch_work can
@@ -87,7 +87,8 @@ class AsyncGa:
                  max_table_step: int = 5,
                  member_type=Member,
                  member_type_kwargs: Dict = None,
-                 save_filename: Path = None):
+                 save_filename: Path = None,
+                 save_every: int = None):
         """
         :param initial_state: a numpy array with the initial parameter guess.
         :param population_size: the desired size of the evolutionary population.
@@ -109,6 +110,8 @@ class AsyncGa:
         :param member_type_kwargs: additional keyword arguments not related
         to the base Member arguments.
         :param save_filename: a filename or path to save the output to.
+        :param save_every: save population every X number of steps
+        (default saves only at end).
         """
         if member_type_kwargs is None:
             member_type_kwargs = {}
@@ -130,6 +133,7 @@ class AsyncGa:
         self._table_size = table_size
         self._max_table_step = max_table_step
         self._save_filename = save_filename
+        self._save_every = save_every
 
         self._cost_rank_sum = self._population_size \
                               * (self._population_size + 1) / 2
@@ -155,7 +159,7 @@ class AsyncGa:
             take_member: bool = False):
         """
         Executes the genetic algorithm.
-        :param fitness_function: a function that returns the fitness of a lineage
+        :param fitness_function: a function that returns the fitness of a lineage.
         :param num_iterations: the number of steps to run.
         :param fitness_kwargs: any key word arguments for fitness_function.
         :param take_member: whether the fitness function requires the member to be
@@ -163,6 +167,9 @@ class AsyncGa:
         """
         if fitness_kwargs is None:
             fitness_kwargs = {}
+
+        if self._save_every is None:
+            self._save_every = num_iterations
 
         # distribute members for each worker
         num_workers = self._scheduler.num_workers()
@@ -208,6 +215,10 @@ class AsyncGa:
             fitness, lineage, index = completed_job.result()
             self._replacement(lineage, fitness)
             self._update_fitness_history()
+            if (self._save_filename is not None) and \
+                    (self._step % self._save_every == 0):
+                self.save_population(self._save_filename)
+
             if self._step < num_iterations:
                 self._anneal()
                 working_batch.add(self._scheduler.client.submit(
