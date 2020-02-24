@@ -36,7 +36,6 @@ def dispatch_work(fitness_function: Union[Callable[[Member], float],
                   member: Member,
                   member_id: int,
                   fitness_kwargs: Dict = None,
-                  is_initial: bool = False,
                   take_member: bool = False) -> Tuple[float, Lineage, int, bool]:
     """
     Sends out work to a member and returns a tuple of the fitness and its
@@ -49,7 +48,6 @@ def dispatch_work(fitness_function: Union[Callable[[Member], float],
     :param lineage: the lineage for the member to use to generate parameters.
     :param member: an initialized member.
     :param member_id: id of the member.
-    :param is_initial: specifies whether it is part of the initial dispatch
     :param fitness_kwargs: additional arguments for the fitness function
     :param take_member: whether the fitness function requires the member to be
     provided or not (if not then expects an array) (default: False).
@@ -61,11 +59,11 @@ def dispatch_work(fitness_function: Union[Callable[[Member], float],
     member.appropriate_lineage(lineage)
     if take_member:
         return fitness_function(member, **fitness_kwargs),\
-               lineage, member_id, is_initial
+               lineage, member_id
 
     else:
         return fitness_function(member.parameters, **fitness_kwargs),\
-               lineage, member_id, is_initial
+               lineage, member_id
 
 
 class AsyncGa:
@@ -181,27 +179,40 @@ class AsyncGa:
                 dispatch_work,
                 fitness_function,
                 self._population[pop]['lineage'],
-                members[i], i, fitness_kwargs, True, take_member,
+                members[i], i, fitness_kwargs, take_member,
                 workers=[workers[i]])
             for i, pop_group in enumerate(
                 split_work(list(range(self._population_size)), num_workers))
             for pop in pop_group]
 
-        # iterate ga until num_iterations reached
-        working_batch = Scheduler.as_completed(initial_batch)
-        for completed_job in working_batch:
-            fitness, lineage, index, is_initial = completed_job.result()
-            if is_initial:
-                self._set_initial(lineage, fitness)
-            else:
-                self._replacement(lineage, fitness)
+        # wait for initial batch to complete and fill initial population
+        for completed_job in Scheduler.as_completed(initial_batch):
+            fitness, lineage, index = completed_job.result()
+            self._set_initial(lineage, fitness)
 
+        # submit jobs to all workers or till num iterations is saturated
+        jobs = []
+        for index in range(min(num_iterations, len(members))):
+            self._anneal()
+            jobs.append(self._scheduler.client.submit(
+                dispatch_work, fitness_function,
+                self._mutation(self._selection()),
+                members[index], index, fitness_kwargs,
+                take_member=take_member,
+                workers=[workers[index]]))
+            self._step += 1
+
+        # iterate ga until num_iterations reached
+        working_batch = Scheduler.as_completed(jobs)
+        for completed_job in working_batch:
+            fitness, lineage, index = completed_job.result()
+            self._replacement(lineage, fitness)
             self._update_fitness_history()
             if self._step < num_iterations:
                 self._anneal()
-                new_lineage = self._mutation(self._selection())
                 working_batch.add(self._scheduler.client.submit(
-                    dispatch_work, fitness_function, new_lineage,
+                    dispatch_work, fitness_function,
+                    self._mutation(self._selection()),
                     members[index], index, fitness_kwargs,
                     take_member=take_member,
                     workers=[workers[index]]))
@@ -290,7 +301,9 @@ class AsyncGa:
                     closest_distance = distance
                     closest_member_index = i
 
-        if self._population[closest_member_index]['fitness'] < fitness:
+        # Replacement does not take place if no evaluated closest member is found
+        if (closest_member_index is not None) and \
+                (self._population[closest_member_index]['fitness'] < fitness):
             self._population[closest_member_index] = {'lineage': lineage,
                                                       'fitness': fitness}
 
