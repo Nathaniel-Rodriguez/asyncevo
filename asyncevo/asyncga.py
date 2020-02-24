@@ -17,6 +17,7 @@ from asyncevo import Member
 from asyncevo import manhattan_distance
 from asyncevo import split_work
 from asyncevo import save
+from asyncevo import load
 from asyncevo import DEFAULT_TYPE
 
 
@@ -88,7 +89,9 @@ class AsyncGa:
                  member_type=Member,
                  member_type_kwargs: Dict = None,
                  save_filename: Path = None,
-                 save_every: int = None):
+                 save_every: int = None,
+                 *args,
+                 **kwargs):
         """
         :param initial_state: a numpy array with the initial parameter guess.
         :param population_size: the desired size of the evolutionary population.
@@ -134,15 +137,16 @@ class AsyncGa:
         self._max_table_step = max_table_step
         self._save_filename = save_filename
         self._save_every = save_every
+        self._from_file = kwargs.get("from_file", False)
 
         self._cost_rank_sum = self._population_size \
                               * (self._population_size + 1) / 2
         self._selection_probabilities = [self._linearly_scaled_member_rank(i)
                                          for i in range(self._population_size)]
-        self._fitness_history = []
+        self._fitness_history = kwargs.get('history', [])
         self._rng = Random(self._global_seed)
-        self._population = self._initialize()
-        self._table_seed = self._make_seed()
+        self._population = kwargs.get('population', self._initialize())
+        self._table_seed = kwargs.get('table_seed', self._make_seed())
         self._member_type = member_type
         self._member_type_kwargs = member_type_kwargs
         self._member_parameters = {'initial_state': self._initial_state,
@@ -152,6 +156,39 @@ class AsyncGa:
         self._member_type_kwargs.update(self._member_parameters)
         self._member_buffer1 = Member(**self._member_parameters)
         self._member_buffer2 = Member(**self._member_parameters)
+
+    @classmethod
+    def from_file(cls,
+                  filename: Path,
+                  scheduler: Scheduler,
+                  global_seed: int,
+                  sigma: float,
+                  cooling_factor: float = 1.0,
+                  annealing_start: int = 0,
+                  annealing_stop: int = inf,
+                  member_type=Member,
+                  member_type_kwargs: Dict = None,
+                  save_filename: Path = None,
+                  save_every: int = None):
+        file_contents = load(filename)
+        return cls(file_contents['initial_state'],
+                   len(file_contents['population']),
+                   scheduler,
+                   global_seed,
+                   sigma,
+                   cooling_factor,
+                   annealing_start,
+                   annealing_stop,
+                   file_contents['table_size'],
+                   file_contents['max_table_step'],
+                   member_type,
+                   member_type_kwargs,
+                   save_filename,
+                   save_every,
+                   population=file_contents['population'],
+                   history=file_contents['history'],
+                   table_seed=file_contents['table_seed'],
+                   from_file=True)
 
     def run(self, fitness_function: Callable[[np.ndarray], float],
             num_iterations: int,
@@ -180,22 +217,24 @@ class AsyncGa:
                                                  workers=[worker])
                    for worker in workers]
 
-        # create initial batch
-        initial_batch = [
-            self._scheduler.client.submit(
-                dispatch_work,
-                fitness_function,
-                self._population[pop]['lineage'],
-                members[i], i, fitness_kwargs, take_member,
-                workers=[workers[i]])
-            for i, pop_group in enumerate(
-                split_work(list(range(self._population_size)), num_workers))
-            for pop in pop_group]
+        # skip if population is loaded from file
+        if not self._from_file:
+            # create initial batch
+            initial_batch = [
+                self._scheduler.client.submit(
+                    dispatch_work,
+                    fitness_function,
+                    self._population[pop]['lineage'],
+                    members[i], i, fitness_kwargs, take_member,
+                    workers=[workers[i]])
+                for i, pop_group in enumerate(
+                    split_work(list(range(self._population_size)), num_workers))
+                for pop in pop_group]
 
-        # wait for initial batch to complete and fill initial population
-        for completed_job in Scheduler.as_completed(initial_batch):
-            fitness, lineage, index = completed_job.result()
-            self._set_initial(lineage, fitness)
+            # wait for initial batch to complete and fill initial population
+            for completed_job in Scheduler.as_completed(initial_batch):
+                fitness, lineage, index = completed_job.result()
+                self._set_initial(lineage, fitness)
 
         # submit jobs to all workers or till num iterations is saturated
         jobs = []
