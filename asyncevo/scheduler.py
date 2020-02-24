@@ -24,7 +24,7 @@ class Scheduler:
         dask-mpi arguments
         ------------------
         interface:str
-        Network interface like ‘eth0’ or ‘ib0’
+        Network interface like ‘eth0’ or ‘ib0’ or 'lo'
 
         nthreads:int
         Number of threads per worker
@@ -33,7 +33,8 @@ class Scheduler:
         Directory to place worker files
 
         memory_limit:int, float, or ‘auto’
-        Number of bytes before spilling data to disk. This can be an integer (nbytes), float (fraction of total memory), or ‘auto’.
+        Number of bytes before spilling data to disk. This can be an integer
+         (nbytes), float (fraction of total memory), or ‘auto’.
 
         nanny:bool
         Start workers in nanny process for management
