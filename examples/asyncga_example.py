@@ -55,32 +55,31 @@ def member_example(member):
 
 def main():
     # make the scheduler first
-    mpi_scheduler = Scheduler({'nanny': False})
+    with Scheduler({'nanny': False}) as mpi_scheduler:
+        # create and run GA
+        ga = AsyncGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
+                     population_size=20,
+                     scheduler=mpi_scheduler,
+                     global_seed=96879,
+                     sigma=1.0,
+                     cooling_factor=0.996,
+                     annealing_start=0,
+                     annealing_stop=inf,
+                     table_size=20000,
+                     max_table_step=2,
+                     member_type=Member,
+                     save_filename=Path("test.asyncga"),
+                     save_every=100)
+        ga.run(member_example, 300, take_member=True)
 
-    # create and run GA
-    ga = AsyncGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
-                 population_size=20,
-                 scheduler=mpi_scheduler,
-                 global_seed=96879,
-                 sigma=1.0,
-                 cooling_factor=0.996,
-                 annealing_start=0,
-                 annealing_stop=inf,
-                 table_size=20000,
-                 max_table_step=2,
-                 member_type=Member,
-                 save_filename=Path("test.asyncga"),
-                 save_every=100)
-    ga.run(member_example, 300, take_member=True)
-
-    # load pop from file and continue
-    ga = AsyncGa.from_file("test.asyncga",
-                           scheduler=mpi_scheduler,
-                           global_seed=432,
-                           sigma=1.0,
-                           cooling_factor=1.0,
-                           save_filename="test.asyncga")
-    ga.run(member_example, 50, take_member=True)
+        # load pop from file and continue
+        ga = AsyncGa.from_file("test.asyncga",
+                               scheduler=mpi_scheduler,
+                               global_seed=432,
+                               sigma=1.0,
+                               cooling_factor=1.0,
+                               save_filename="test.asyncga")
+        ga.run(member_example, 50, take_member=True)
 
 
 if __name__ == "__main__":
