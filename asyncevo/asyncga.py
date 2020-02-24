@@ -209,6 +209,7 @@ class AsyncGa:
             self._save_every = num_iterations
 
         # distribute members for each worker
+        self._scheduler.wait_on_workers()
         num_workers = self._scheduler.num_workers()
         if num_workers == 0:
             raise ValueError("Error: there are no workers.")
