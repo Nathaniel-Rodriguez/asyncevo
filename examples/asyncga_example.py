@@ -55,7 +55,7 @@ def member_example(member):
 
 def main():
     # make the scheduler first
-    with Scheduler({'nanny': False}) as mpi_scheduler:
+    with Scheduler({'nanny': True, 'interface': 'lo'}) as mpi_scheduler:
         # create and run GA
         ga = AsyncGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
                      population_size=20,
