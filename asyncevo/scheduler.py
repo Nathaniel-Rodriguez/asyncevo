@@ -1,26 +1,33 @@
-from typing import List
-
-
 __all__ = ['Scheduler']
+
+
+from typing import List
+from typing import Dict
 
 
 class Scheduler:
     """
     A wrapper around dask-mpi.
     """
-    def __init__(self):
+    def __init__(self, initialization_args: Dict = None,
+                 client_args: Dict = None):
         """
         Creating a scheduler initializes dask MPI
         """
+        if initialization_args is None:
+            initialization_args = {}
+
+        if client_args is None:
+            client_args = {}
 
         from dask_mpi import initialize
-        initialize()
+        initialize(**initialization_args)
         # Rank 0 is initialized with scheduler
         # Rank 1 will pass through and execute following code
         # Rank 2+ will execute workers
 
         from distributed import Client
-        self._client = Client()  # TODO specify memory
+        self._client = Client(**client_args)  # TODO specify memory
 
     @property
     def client(self):
