@@ -17,6 +17,7 @@ from asyncevo import Member
 from asyncevo import manhattan_distance
 from asyncevo import split_work
 from asyncevo import save
+from asyncevo import load
 from asyncevo import DEFAULT_TYPE
 
 
@@ -36,8 +37,7 @@ def dispatch_work(fitness_function: Union[Callable[[Member], float],
                   member: Member,
                   member_id: int,
                   fitness_kwargs: Dict = None,
-                  is_initial: bool = False,
-                  take_member: bool = False) -> Tuple[float, Lineage, int, bool]:
+                  take_member: bool = False) -> Tuple[float, Lineage, int]:
     """
     Sends out work to a member and returns a tuple of the fitness and its
     associated lineage. The lineage is returned so that dispatch_work can
@@ -49,7 +49,6 @@ def dispatch_work(fitness_function: Union[Callable[[Member], float],
     :param lineage: the lineage for the member to use to generate parameters.
     :param member: an initialized member.
     :param member_id: id of the member.
-    :param is_initial: specifies whether it is part of the initial dispatch
     :param fitness_kwargs: additional arguments for the fitness function
     :param take_member: whether the fitness function requires the member to be
     provided or not (if not then expects an array) (default: False).
@@ -61,11 +60,11 @@ def dispatch_work(fitness_function: Union[Callable[[Member], float],
     member.appropriate_lineage(lineage)
     if take_member:
         return fitness_function(member, **fitness_kwargs),\
-               lineage, member_id, is_initial
+               lineage, member_id
 
     else:
         return fitness_function(member.parameters, **fitness_kwargs),\
-               lineage, member_id, is_initial
+               lineage, member_id
 
 
 class AsyncGa:
@@ -89,7 +88,10 @@ class AsyncGa:
                  max_table_step: int = 5,
                  member_type=Member,
                  member_type_kwargs: Dict = None,
-                 save_filename: Path = None):
+                 save_filename: Path = None,
+                 save_every: int = None,
+                 *args,
+                 **kwargs):
         """
         :param initial_state: a numpy array with the initial parameter guess.
         :param population_size: the desired size of the evolutionary population.
@@ -111,6 +113,8 @@ class AsyncGa:
         :param member_type_kwargs: additional keyword arguments not related
         to the base Member arguments.
         :param save_filename: a filename or path to save the output to.
+        :param save_every: save population every X number of steps
+        (default saves only at end).
         """
         if member_type_kwargs is None:
             member_type_kwargs = {}
@@ -132,15 +136,17 @@ class AsyncGa:
         self._table_size = table_size
         self._max_table_step = max_table_step
         self._save_filename = save_filename
+        self._save_every = save_every
+        self._from_file = kwargs.get("from_file", False)
 
         self._cost_rank_sum = self._population_size \
                               * (self._population_size + 1) / 2
         self._selection_probabilities = [self._linearly_scaled_member_rank(i)
                                          for i in range(self._population_size)]
-        self._fitness_history = []
+        self._fitness_history = kwargs.get('history', [])
         self._rng = Random(self._global_seed)
-        self._population = self._initialize()
-        self._table_seed = self._make_seed()
+        self._population = kwargs.get('population', self._initialize())
+        self._table_seed = kwargs.get('table_seed', self._make_seed())
         self._member_type = member_type
         self._member_type_kwargs = member_type_kwargs
         self._member_parameters = {'initial_state': self._initial_state,
@@ -151,13 +157,46 @@ class AsyncGa:
         self._member_buffer1 = Member(**self._member_parameters)
         self._member_buffer2 = Member(**self._member_parameters)
 
+    @classmethod
+    def from_file(cls,
+                  filename: Path,
+                  scheduler: Scheduler,
+                  global_seed: int,
+                  sigma: float,
+                  cooling_factor: float = 1.0,
+                  annealing_start: int = 0,
+                  annealing_stop: int = inf,
+                  member_type=Member,
+                  member_type_kwargs: Dict = None,
+                  save_filename: Path = None,
+                  save_every: int = None):
+        file_contents = load(filename)
+        return cls(file_contents['initial_state'],
+                   len(file_contents['population']),
+                   scheduler,
+                   global_seed,
+                   sigma,
+                   cooling_factor,
+                   annealing_start,
+                   annealing_stop,
+                   file_contents['table_size'],
+                   file_contents['max_table_step'],
+                   member_type,
+                   member_type_kwargs,
+                   save_filename,
+                   save_every,
+                   population=file_contents['population'],
+                   history=file_contents['history'],
+                   table_seed=file_contents['table_seed'],
+                   from_file=True)
+
     def run(self, fitness_function: Callable[[np.ndarray], float],
             num_iterations: int,
             fitness_kwargs: Dict = None,
             take_member: bool = False):
         """
         Executes the genetic algorithm.
-        :param fitness_function: a function that returns the fitness of a lineage
+        :param fitness_function: a function that returns the fitness of a lineage.
         :param num_iterations: the number of steps to run.
         :param fitness_kwargs: any key word arguments for fitness_function.
         :param take_member: whether the fitness function requires the member to be
@@ -166,42 +205,69 @@ class AsyncGa:
         if fitness_kwargs is None:
             fitness_kwargs = {}
 
+        if self._save_every is None:
+            self._save_every = num_iterations
+
         # distribute members for each worker
+        self._scheduler.wait_on_workers()
         num_workers = self._scheduler.num_workers()
+        if num_workers == 0:
+            raise ValueError("Error: there are no workers.")
         workers = self._scheduler.get_worker_names()
+        if len(workers) == 0:
+            raise ValueError("Error: there are no workers.")
         members = [self._scheduler.client.submit(initialize_member,
                                                  self._member_type,
                                                  self._member_type_kwargs,
                                                  workers=[worker])
                    for worker in workers]
 
-        # create initial batch
-        initial_batch = [
-            self._scheduler.client.submit(
-                dispatch_work,
-                fitness_function,
-                self._population[pop]['lineage'],
-                members[i], i, fitness_kwargs, True, take_member,
-                workers=[workers[i]])
-            for i, pop_group in enumerate(
-                split_work(list(range(self._population_size)), num_workers))
-            for pop in pop_group]
+        # skip if population is loaded from file
+        if not self._from_file:
+            # create initial batch
+            initial_batch = [
+                self._scheduler.client.submit(
+                    dispatch_work,
+                    fitness_function,
+                    self._population[pop]['lineage'],
+                    members[i], i, fitness_kwargs, take_member,
+                    workers=[workers[i]])
+                for i, pop_group in enumerate(
+                    split_work(list(range(self._population_size)), num_workers))
+                for pop in pop_group]
+
+            # wait for initial batch to complete and fill initial population
+            for completed_job in Scheduler.as_completed(initial_batch):
+                fitness, lineage, index = completed_job.result()
+                self._set_initial(lineage, fitness)
+
+        # submit jobs to all workers or till num iterations is saturated
+        jobs = []
+        for index in range(min(num_iterations, len(members))):
+            self._anneal()
+            jobs.append(self._scheduler.client.submit(
+                dispatch_work, fitness_function,
+                self._mutation(self._selection()),
+                members[index], index, fitness_kwargs,
+                take_member=take_member,
+                workers=[workers[index]]))
+            self._step += 1
 
         # iterate ga until num_iterations reached
-        working_batch = Scheduler.as_completed(initial_batch)
+        working_batch = Scheduler.as_completed(jobs)
         for completed_job in working_batch:
-            fitness, lineage, index, is_initial = completed_job.result()
-            if is_initial:
-                self._set_initial(lineage, fitness)
-            else:
-                self._replacement(lineage, fitness)
-
+            fitness, lineage, index = completed_job.result()
+            self._replacement(lineage, fitness)
             self._update_fitness_history()
+            if (self._save_filename is not None) and \
+                    (self._step % self._save_every == 0):
+                self.save_population(self._save_filename)
+
             if self._step < num_iterations:
                 self._anneal()
-                new_lineage = self._mutation(self._selection())
                 working_batch.add(self._scheduler.client.submit(
-                    dispatch_work, fitness_function, new_lineage,
+                    dispatch_work, fitness_function,
+                    self._mutation(self._selection()),
                     members[index], index, fitness_kwargs,
                     take_member=take_member,
                     workers=[workers[index]]))
@@ -290,7 +356,9 @@ class AsyncGa:
                     closest_distance = distance
                     closest_member_index = i
 
-        if self._population[closest_member_index]['fitness'] < fitness:
+        # Replacement does not take place if no evaluated closest member is found
+        if (closest_member_index is not None) and \
+                (self._population[closest_member_index]['fitness'] < fitness):
             self._population[closest_member_index] = {'lineage': lineage,
                                                       'fitness': fitness}
 
