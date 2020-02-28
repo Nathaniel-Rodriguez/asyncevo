@@ -90,7 +90,7 @@ class AsyncGa:
                  member_type_kwargs: Dict = None,
                  save_filename: Path = None,
                  save_every: int = None,
-                 replacement_strategy="crowding",
+                 replacement_strategy: str = "crowding",
                  *args,
                  **kwargs):
         """
@@ -178,7 +178,8 @@ class AsyncGa:
                   member_type=Member,
                   member_type_kwargs: Dict = None,
                   save_filename: Path = None,
-                  save_every: int = None):
+                  save_every: int = None,
+                  replacement_strategy: str = "crowding"):
         file_contents = load(filename)
         return cls(file_contents['initial_state'],
                    len(file_contents['population']),
@@ -194,6 +195,7 @@ class AsyncGa:
                    member_type_kwargs,
                    save_filename,
                    save_every,
+                   replacement_strategy,
                    population=file_contents['population'],
                    history=file_contents['history'],
                    table_seed=file_contents['table_seed'],
