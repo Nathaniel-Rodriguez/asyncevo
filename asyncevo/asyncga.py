@@ -382,7 +382,7 @@ class AsyncGa:
         """
         # find lowest fitness pop and then replace
         weakest_member = None
-        lowest_fitness = -inf
+        lowest_fitness = inf
         for i, pop in enumerate(self._population):
             if (pop['fitness'] is not None) and (pop['fitness'] < lowest_fitness):
                 weakest_member = i
