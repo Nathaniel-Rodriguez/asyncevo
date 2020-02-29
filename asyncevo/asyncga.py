@@ -90,6 +90,7 @@ class AsyncGa:
                  member_type_kwargs: Dict = None,
                  save_filename: Path = None,
                  save_every: int = None,
+                 replacement_strategy: str = "crowding",
                  *args,
                  **kwargs):
         """
@@ -115,6 +116,10 @@ class AsyncGa:
         :param save_filename: a filename or path to save the output to.
         :param save_every: save population every X number of steps
         (default saves only at end).
+        :param replacement_strategy: the type of replacement strategy to use:
+            crowding: calculates manhattan distance to find nearest neighbor
+                and replaces that neighbor if it is more fit.
+            worst: replace worst member only if better.
         """
         if member_type_kwargs is None:
             member_type_kwargs = {}
@@ -138,6 +143,10 @@ class AsyncGa:
         self._save_filename = save_filename
         self._save_every = save_every
         self._from_file = kwargs.get("from_file", False)
+        if replacement_strategy == "crowding":
+            self._replacement = self._crowding
+        elif replacement_strategy == "worst":
+            self._replacement = self._worst
 
         self._cost_rank_sum = self._population_size \
                               * (self._population_size + 1) / 2
@@ -169,7 +178,8 @@ class AsyncGa:
                   member_type=Member,
                   member_type_kwargs: Dict = None,
                   save_filename: Path = None,
-                  save_every: int = None):
+                  save_every: int = None,
+                  replacement_strategy: str = "crowding"):
         file_contents = load(filename)
         return cls(file_contents['initial_state'],
                    len(file_contents['population']),
@@ -185,6 +195,7 @@ class AsyncGa:
                    member_type_kwargs,
                    save_filename,
                    save_every,
+                   replacement_strategy,
                    population=file_contents['population'],
                    history=file_contents['history'],
                    table_seed=file_contents['table_seed'],
@@ -319,7 +330,7 @@ class AsyncGa:
         mutant.add_history(self._make_seed(), self._sigma)
         return mutant
 
-    def _replacement(self, lineage: Lineage, fitness: float):
+    def _crowding(self, lineage: Lineage, fitness: float):
         """
         Crowding replacement. Given a lineage, express the member and find its
         manhattan distance to the parameters of other lineages in the
@@ -362,13 +373,34 @@ class AsyncGa:
             self._population[closest_member_index] = {'lineage': lineage,
                                                       'fitness': fitness}
 
+    def _worst(self, lineage: Lineage, fitness: float):
+        """
+        Worst replacement. Given a lineage, if the given lineage is better than
+        the worst population neighbor, replace that member in the population.
+        :param lineage: a new lineage to check for replacement
+        :param fitness: fitness of lineage
+        """
+        # find lowest fitness pop and then replace
+        weakest_member = None
+        lowest_fitness = inf
+        for i, pop in enumerate(self._population):
+            if (pop['fitness'] is not None) and (pop['fitness'] < lowest_fitness):
+                weakest_member = i
+                lowest_fitness = pop['fitness']
+
+        if fitness > lowest_fitness and weakest_member is not None:
+            self._population[weakest_member]['lineage'] = lineage
+            self._population[weakest_member]['fitness'] = fitness
+
     def _anneal(self):
         """
         Applies annealing to sigma.
         """
+        print(self._step, self._sigma, flush=True)
         if (self._step > self._annealing_start) \
            and (self._step < self._annealing_stop):
-            self._sigma = self._sigma0 * (self._cooling_factor ** self._step)
+            self._sigma = self._sigma0 * (self._cooling_factor **
+                                          (self._step - self._annealing_start))
 
     def _set_initial(self, lineage: Lineage, fitness: float):
         """
