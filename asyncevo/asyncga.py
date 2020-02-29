@@ -396,9 +396,11 @@ class AsyncGa:
         """
         Applies annealing to sigma.
         """
+        print(self._step, self._sigma, flush=True)
         if (self._step > self._annealing_start) \
            and (self._step < self._annealing_stop):
-            self._sigma = self._sigma0 * (self._cooling_factor ** self._step)
+            self._sigma = self._sigma0 * (self._cooling_factor **
+                                          (self._step - self._annealing_start))
 
     def _set_initial(self, lineage: Lineage, fitness: float):
         """
