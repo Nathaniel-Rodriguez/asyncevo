@@ -70,8 +70,8 @@ def dispatch_work(fitness_function: Union[Callable[[Member], float],
 class AsyncGa:
     """
     An asynchronous steady-state genetic algorithm that uses random selection
-    and crowding replacement. An exponential annealing schedule is used to
-    change the mutation size over time.
+    and crowding or worst replacement. An exponential annealing schedule is used
+    to change the mutation size over time.
     """
     dtype = DEFAULT_TYPE  # a single numpy type is used for all arrays
 
