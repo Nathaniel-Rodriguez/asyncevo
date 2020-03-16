@@ -1,15 +1,14 @@
 __all__ = ['CSALineage']
 
 
-from collections.abc import Sequence
+from typing import List
+from collections import namedtuple
 
 
-# add own path seperate from lineage??
-# problem with asynchrony... our parents maybe dead or
-# we may have an old step that gave rise to us.
-# so what we really need is to know every pop that happened up to us
-# and our branch from it.
-class CSALineage(Sequence):
+EvoPathMarker = namedtuple('EvoPathMarker', ['seed', 'fitness'])
+
+
+class CSALineage:
     """
     A CSALineage represents the compressed form of the parameters used to
     regenerate a member's parameters from an initial vector. This lineage
@@ -18,26 +17,44 @@ class CSALineage(Sequence):
     def __init__(self, seed: int = None):
         self._lineage = []
         self._path_lineage = []
+        if seed is not None:
+            self._lineage.append(seed)
 
-    def add_history(self, seed: int):
-        self._lineage.append({'seed': seed})
+    def add_lineage_history(self, seed: int):
+        self._lineage.append(seed)
 
-    def add_path_history(self, population):
-        self._path_lineage.append()
+    def add_path_history(self, population_markers: List[EvoPathMarker]):
+        self._path_lineage.append(population_markers)
 
-    def __getitem__(self, i):
-        return self._lineage[i]
+    @property
+    def lineage(self):
+        return self._lineage
 
-    def __len__(self):
-        return len(self._lineage)
+    @lineage.setter
+    def lineage(self, value):
+        raise NotImplementedError
+
+    @property
+    def path(self):
+        return self._path_lineage
+
+    @path.setter
+    def path(self, value):
+        raise NotImplementedError
 
     def __eq__(self, other):
-        if len(other) != len(self):
+        if len(other.lineage) != len(self.lineage):
             return False
 
-        for i in range(len(self)):
-            if not (self[i]['seed'] == other[i]['seed']
-                    and self[i]['fitness'] == other[i]['fitness']):
+        if len(other.path) != len(self.path):
+            return False
+
+        for i in range(len(self.lineage)):
+            if other.lineage[i] != self.lineage[i]:
+                return False
+
+        for i in range(len(self.path)):
+            if other.path[i] != self.path[i]:
                 return False
 
         return True
