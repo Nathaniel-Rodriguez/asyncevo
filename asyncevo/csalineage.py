@@ -1,4 +1,4 @@
-__all__ = ['CSALineage']
+__all__ = ['CSALineage', 'EvoPathMarker']
 
 
 from typing import List
