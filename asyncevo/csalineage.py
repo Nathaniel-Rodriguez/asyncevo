@@ -9,7 +9,6 @@ from collections.abc import Sequence
 # we may have an old step that gave rise to us.
 # so what we really need is to know every pop that happened up to us
 # and our branch from it.
-# at any point in time there will be many evo paths
 class CSALineage(Sequence):
     """
     A CSALineage represents the compressed form of the parameters used to
@@ -17,11 +16,14 @@ class CSALineage(Sequence):
     contains the seeds and fitness of all past members of the population.
     """
     def __init__(self, seed: int = None):
-        self._own_seed = seed
         self._lineage = []
+        self._path_lineage = []
 
-    def add_history(self, seed: int, fitness: float):
-        self._lineage.append({'seed': seed, 'fitness': fitness})
+    def add_history(self, seed: int):
+        self._lineage.append({'seed': seed})
+
+    def add_path_history(self, population):
+        self._path_lineage.append()
 
     def __getitem__(self, i):
         return self._lineage[i]

@@ -77,16 +77,15 @@ class CSAMember:
         self._lineage = lineage
         self._has_lineage = True
 
-        # need to specify which lineage is own, vs population, so
-        # we only generate x along that line. All other lines only need z
-        # for updating the evo path and sigma
+        # need to alternate calls to lineage and population thing
+        # it ends when we hit the last lineage call.
+        # it goes, lineage->pop->lineage->pop...->lineage
+        # this makes sure last evopath update which isn't used doesn't happen
 
         # build lineage
         for pop in self._lineage:
             self._regenerate_path(pop)
             self._regenerate_sigma(pop)
-
-        # build self
 
     def _regenerate_path(self, pop):
         """
