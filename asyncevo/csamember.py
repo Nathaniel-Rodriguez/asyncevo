@@ -98,8 +98,9 @@ class CSAMember(BaseMember):
         pop = self._lineage.path[historical_index]
         self._delta_path.fill(0.0)
         # add up all the permutations to find delta path
-        for i, member in enumerate(sorted(pop, key='fitness', reverse=True)):
-            self._rng.seed(member['seed'])
+        for i, member in enumerate(sorted(pop, key=lambda x: x.fitness,
+                                          reverse=True)):
+            self._rng.seed(member.seed)
             param_slices = self._draw_random_parameter_slices(self._rng)
             table_slices = self._draw_random_table_slices(self._rng)
             param_slices, table_slices = match_slices(param_slices, table_slices)
