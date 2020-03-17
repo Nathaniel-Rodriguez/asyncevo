@@ -3,6 +3,7 @@ __all__ = ['AsyncCSAGa']
 import numpy as np
 from typing import Dict
 from typing import Callable
+from typing import Union
 from typing import List
 from pathlib import Path
 from random import Random
@@ -18,7 +19,43 @@ from asyncevo import save
 from asyncevo import load
 from asyncevo import DEFAULT_TYPE
 from asyncevo import initialize_member
-from asyncevo import dispatch_work
+from typing import Any
+from typing import Tuple
+
+
+def dispatch_csa_work(fitness_function: Union[Callable[[CSAMember], float],
+                                          Callable[[np.ndarray], float]],
+                  lineage: Any,
+                  member: CSAMember,
+                  member_id: int,
+                  fitness_kwargs: Dict = None,
+                  take_member: bool = False) -> Tuple[float, Any, int, float]:
+    """
+    Sends out work to a member and returns a tuple of the fitness, its
+    associated lineage, and global step size.
+    :param fitness_function: a callable object that takes member parameters
+    numpy array and returns a fitness value. It can also be a callable
+    that takes as an argument a Member or subclass of Member and returns the
+    fitness.
+    :param lineage: the lineage for the member to use to generate parameters.
+    :param member: an initialized member.
+    :param member_id: id of the member.
+    :param fitness_kwargs: additional arguments for the fitness function
+    :param take_member: whether the fitness function requires the member to be
+    provided or not (if not then expects an array) (default: False).
+    :return: fitness, lineage, member id, and is_initial
+    """
+    if fitness_kwargs is None:
+        fitness_kwargs = {}
+
+    member.appropriate_lineage(lineage)
+    if take_member:
+        return fitness_function(member, **fitness_kwargs),\
+               lineage, member_id, member.sigma
+
+    else:
+        return fitness_function(member.parameters, **fitness_kwargs),\
+               lineage, member_id, member.sigma
 
 
 class AsyncCSAGa:
@@ -81,6 +118,7 @@ class AsyncCSAGa:
         self._selection_probabilities = [self._linearly_scaled_member_rank(i)
                                          for i in range(self._population_size)]
         self._fitness_history = kwargs.get('history', [])
+        self._sigma_history = kwargs.get('sigma_history', [])
         self._rng = Random(self._global_seed)
         self._population = kwargs.get('population', self._initialize())
         self._table_seed = kwargs.get('table_seed', self._make_seed())
@@ -124,6 +162,7 @@ class AsyncCSAGa:
                    save_every,
                    population=file_contents['population'],
                    history=file_contents['history'],
+                   sigma_history=file_contents['sigma_history'],
                    table_seed=file_contents['table_seed'],
                    from_file=True)
 
@@ -164,7 +203,7 @@ class AsyncCSAGa:
             # create initial batch
             initial_batch = [
                 self._scheduler.client.submit(
-                    dispatch_work,
+                    dispatch_csa_work,
                     fitness_function,
                     self._population[pop]['lineage'],
                     members[i], i, fitness_kwargs, take_member,
@@ -175,14 +214,14 @@ class AsyncCSAGa:
 
             # wait for initial batch to complete and fill initial population
             for completed_job in Scheduler.as_completed(initial_batch):
-                fitness, lineage, index = completed_job.result()
-                self._set_initial(lineage, fitness)
+                fitness, lineage, index, sigma = completed_job.result()
+                self._set_initial(lineage, fitness, sigma)
 
         # submit jobs to all workers or till num iterations is saturated
         jobs = []
         for index in range(min(num_iterations, len(members))):
             jobs.append(self._scheduler.client.submit(
-                dispatch_work, fitness_function,
+                dispatch_csa_work, fitness_function,
                 self._mutation(self._selection()),
                 members[index], index, fitness_kwargs,
                 take_member=take_member,
@@ -192,8 +231,8 @@ class AsyncCSAGa:
         # iterate ga until num_iterations reached
         working_batch = Scheduler.as_completed(jobs)
         for completed_job in working_batch:
-            fitness, lineage, index = completed_job.result()
-            self._replacement(lineage, fitness)
+            fitness, lineage, index, sigma = completed_job.result()
+            self._replacement(lineage, fitness, sigma)
             self._update_fitness_history()
             if (self._save_filename is not None) and \
                     (self._step % self._save_every == 0):
@@ -201,7 +240,7 @@ class AsyncCSAGa:
 
             if self._step < num_iterations:
                 working_batch.add(self._scheduler.client.submit(
-                    dispatch_work, fitness_function,
+                    dispatch_csa_work, fitness_function,
                     self._mutation(self._selection()),
                     members[index], index, fitness_kwargs,
                     take_member=take_member,
@@ -256,12 +295,13 @@ class AsyncCSAGa:
                                  for pop in self._population])
         return mutant
 
-    def _replacement(self, lineage: CSALineage, fitness: float):
+    def _replacement(self, lineage: CSALineage, fitness: float, sigma: float):
         """
         Worst replacement. Given a lineage, if the given lineage is better than
         the worst population neighbor, replace that member in the population.
         :param lineage: a new lineage to check for replacement
         :param fitness: fitness of lineage
+        :param sigma: the approx magnitude of the step size at time of eval
         """
         # find lowest fitness pop and then replace
         weakest_member = None
@@ -274,17 +314,20 @@ class AsyncCSAGa:
         if fitness > lowest_fitness and weakest_member is not None:
             self._population[weakest_member]['lineage'] = lineage
             self._population[weakest_member]['fitness'] = fitness
+            self._population[weakest_member]['sigma'] = sigma
 
-    def _set_initial(self, lineage: CSALineage, fitness: float):
+    def _set_initial(self, lineage: CSALineage, fitness: float, sigma: float):
         """
         Helps initialize the population with its first members.
         :param lineage: a lineage
         :param fitness: a fitness
+        :param sigma: the approx magnitude of the step size at time of eval
         """
         is_set = False
         for pop in self._population:
             if pop['lineage'] == lineage:
                 pop['fitness'] = fitness
+                pop['sigma'] = sigma
                 is_set = True
 
         if not is_set:
@@ -340,5 +383,6 @@ class AsyncCSAGa:
             'table_seed': self._table_seed,
             'table_size': self._table_size,
             'max_table_step': self._max_table_step,
-            'history': self._fitness_history
+            'history': self._fitness_history,
+            'sigma_history': self._sigma_history
         }, filename)
