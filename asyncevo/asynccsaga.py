@@ -7,10 +7,15 @@ from random import Random
 from math import inf
 from copy import deepcopy
 from asyncevo import Scheduler
+from asyncevo import CSALineage
+from asyncevo import CSAMember
 from asyncevo import split_work
 from asyncevo import save
 from asyncevo import load
 from asyncevo import DEFAULT_TYPE
+from asyncevo import initialize_member
+from asyncevo import dispatch_work
+
 
 class AsyncCSAGa:
     """
@@ -38,3 +43,4 @@ class AsyncCSAGa:
                  save_every: int = None,
                  *args,
                  **kwargs):
+        pass
