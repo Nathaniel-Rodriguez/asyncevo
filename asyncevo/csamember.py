@@ -57,6 +57,7 @@ class CSAMember(BaseMember):
         self._memory_factor = 1 - self._path_memory
         self._has_lineage = False
         self._lineage = None
+        self._global_sigma = 0
 
     @property
     def parameters(self):
@@ -65,6 +66,10 @@ class CSAMember(BaseMember):
     @parameters.setter
     def parameters(self, value):
         raise NotImplementedError
+
+    @property
+    def sigma(self):
+        return self._global_sigma
 
     def appropriate_lineage(self, lineage: CSALineage):
         """
@@ -127,6 +132,7 @@ class CSAMember(BaseMember):
         global_sigma = math.exp(self._path_memory / self._adaptation_speed
                                 * (math.sqrt(np.sum(self._path_buffer))
                                    / math.sqrt(len(self._x)) - 1))
+        self._global_sigma = global_sigma
 
         # parameter-wise step size update
         self._path_buffer[:] = self._path[:]
