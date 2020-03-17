@@ -58,7 +58,7 @@ def main():
     with Scheduler({'nanny': True, 'interface': 'lo'}) as mpi_scheduler:
         # create and run GA
         ga = AsyncCSAGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
-                        initial_sigma=np.ones(4),
+                        initial_sigma=np.ones(4)*5,
                         population_size=5,
                         scheduler=mpi_scheduler,
                         global_seed=96879,

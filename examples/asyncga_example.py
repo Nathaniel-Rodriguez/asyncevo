@@ -58,28 +58,28 @@ def main():
     with Scheduler({'nanny': True, 'interface': 'lo'}) as mpi_scheduler:
         # create and run GA
         ga = AsyncGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
-                     population_size=20,
+                     population_size=5,
                      scheduler=mpi_scheduler,
                      global_seed=96879,
-                     sigma=1.0,
+                     sigma=5.0,
                      cooling_factor=0.996,
                      annealing_start=0,
                      annealing_stop=inf,
                      table_size=20000,
-                     max_table_step=2,
+                     max_table_step=1,
                      member_type=Member,
                      save_filename=Path("test.asyncga"),
-                     save_every=100)
-        ga.run(member_example, 300, take_member=True)
+                     save_every=1000)
+        ga.run(sphere, 300, take_member=False)
 
         # load pop from file and continue
         ga = AsyncGa.from_file("test.asyncga",
                                scheduler=mpi_scheduler,
                                global_seed=432,
-                               sigma=1.0,
+                               sigma=0.1,
                                cooling_factor=1.0,
                                save_filename="test.asyncga")
-        ga.run(member_example, 50, take_member=True)
+        ga.run(sphere, 50, take_member=False)
 
 
 if __name__ == "__main__":
