@@ -2,12 +2,13 @@ __all__ = ['Member']
 
 
 import numpy as np
+from asyncevo.basemember import BaseMember
 from asyncevo.lineage import Lineage
 from asyncevo.sliceops import *
 from asyncevo import DEFAULT_TYPE
 
 
-class Member:
+class Member(BaseMember):
     """
     Represents an expression of a lineage from the population. Upon
     initialization it generates the necessary allocations for appropriation
