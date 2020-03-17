@@ -5,10 +5,11 @@ import numpy as np
 import math
 from asyncevo.csalineage import CSALineage
 from asyncevo.sliceops import *
+from asyncevo.basemember import BaseMember
 from asyncevo import DEFAULT_TYPE
 
 
-class CSAMember:
+class CSAMember(BaseMember):
     """
     Represents an expression of a lineage from the population for an
     AsyncCSAGa. Upon initialization it generates the necessary allocations
