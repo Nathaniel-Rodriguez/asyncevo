@@ -24,12 +24,12 @@ from typing import Tuple
 
 
 def dispatch_csa_work(fitness_function: Union[Callable[[CSAMember], float],
-                                          Callable[[np.ndarray], float]],
-                  lineage: Any,
-                  member: CSAMember,
-                  member_id: int,
-                  fitness_kwargs: Dict = None,
-                  take_member: bool = False) -> Tuple[float, Any, int, float]:
+                                              Callable[[np.ndarray], float]],
+                      lineage: Any,
+                      member: CSAMember,
+                      member_id: int,
+                      fitness_kwargs: Dict = None,
+                      take_member: bool = False) -> Tuple[float, Any, int, float]:
     """
     Sends out work to a member and returns a tuple of the fitness, its
     associated lineage, and global step size.
@@ -234,6 +234,7 @@ class AsyncCSAGa:
             fitness, lineage, index, sigma = completed_job.result()
             self._replacement(lineage, fitness, sigma)
             self._update_fitness_history()
+            self._update_sigma_history()
             if (self._save_filename is not None) and \
                     (self._step % self._save_every == 0):
                 self.save_population(self._save_filename)
@@ -271,7 +272,8 @@ class AsyncCSAGa:
         :return: a list of dictionaries with keys 'lineage' and 'fitness'
         """
         return [{'lineage': CSALineage(self._make_seed()),
-                 'fitness': None}
+                 'fitness': None,
+                 'sigma': None}
                 for _ in range(self._population_size)]
 
     def _selection(self) -> CSALineage:
@@ -291,7 +293,8 @@ class AsyncCSAGa:
         """
         mutant = deepcopy(lineage)
         mutant.add_lineage_history(self._make_seed())
-        mutant.add_path_history([EvoPathMarker(pop['seed'], pop['fitness'])
+        mutant.add_path_history([EvoPathMarker(pop['lineage'].lineage[-1],
+                                               pop['fitness'])
                                  for pop in self._population])
         return mutant
 
@@ -341,6 +344,14 @@ class AsyncCSAGa:
                                       for pop in self._population
                                       if pop['fitness'] is not None])
 
+    def _update_sigma_history(self):
+        """
+        Updates the internal record of the global step size for the population.
+        """
+        self._sigma_history.append([pop['sigma']
+                                    for pop in self._population
+                                    if pop['sigma'] is not None])
+
     def _linearly_scaled_member_rank(self, cost_index):
         """
         Scales the rank of an individual (cost_index)
@@ -380,6 +391,7 @@ class AsyncCSAGa:
             'path_memory': self._path_memory,
             'adaptation_speed': self._adaptation_speed,
             'adaptation_precision': self._adaptation_precision,
+            'population_size': self._population_size,
             'table_seed': self._table_seed,
             'table_size': self._table_size,
             'max_table_step': self._max_table_step,
