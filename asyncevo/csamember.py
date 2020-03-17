@@ -3,7 +3,7 @@ __all__ = ['CSAMember']
 
 import numpy as np
 import math
-from asyncevo.lineage import Lineage
+from asyncevo.csalineage import CSALineage
 from asyncevo.sliceops import *
 from asyncevo import DEFAULT_TYPE
 
@@ -65,7 +65,7 @@ class CSAMember:
     def parameters(self, value):
         raise NotImplementedError
 
-    def appropriate_lineage(self, lineage: Lineage):
+    def appropriate_lineage(self, lineage: CSALineage):
         """
         Take on a lineage and explicitly express its parameters.
         :param lineage: a lineage to appropriate.
@@ -77,20 +77,19 @@ class CSAMember:
         self._lineage = lineage
         self._has_lineage = True
 
-        # need to alternate calls to lineage and population thing
-        # it ends when we hit the last lineage call.
-        # it goes, lineage->pop->lineage->pop...->lineage
-        # this makes sure last evopath update which isn't used doesn't happen
+        for i in range(len(self._lineage.lineage)):
+            self._regenerate_mutation(i)
+            self._regenerate_parameters()
 
-        # build lineage
-        for pop in self._lineage:
-            self._regenerate_path(pop)
-            self._regenerate_sigma(pop)
+            if i < (len(self._lineage.lineage) - 1):
+                self._regenerate_path(i)
+                self._regenerate_sigma()
 
-    def _regenerate_path(self, pop):
+    def _regenerate_path(self, historical_index: int):
         """
         s_path = (1 - path_memory) * s_path + path_rescaling_factor * sum(mutation * weight)
         """
+        pop = self._lineage.path[historical_index]
         self._delta_path.fill(0.0)
         # add up all the permutations to find delta path
         for i, member in enumerate(sorted(pop, key='fitness', reverse=True)):
@@ -141,11 +140,19 @@ class CSAMember:
         np.multiply(self._sigma, self._path_buffer, out=self._sigma)
         np.multiply(self._sigma, global_sigma, out=self._sigma)
 
-    def _regenerate_mutation(self):
-        pass
+    def _regenerate_mutation(self, historical_index: int):
+        self._rng.seed(self._lineage.lineage[historical_index])
+        param_slices = self._draw_random_parameter_slices(self._rng)
+        table_slices = self._draw_random_table_slices(self._rng)
+        param_slices, table_slices = match_slices(param_slices, table_slices)
+        # We assign the table values to the perturbation member first
+        multi_slice_assign(self._mutation, self._table,
+                           param_slices, table_slices)
 
     def _regenerate_parameters(self):
-        pass
+        np.multiply(self._mutation, self._sigma,
+                    out=self._mutation)
+        np.add(self._x, self._mutation, out=self._x)
 
     def _draw_random_parameter_slices(self, rng):
         """
