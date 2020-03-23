@@ -2,7 +2,7 @@ from setuptools import setup
 
 
 setup(name='asyncevo',
-      version='0.1.6',
+      version='0.2.1',
       description='Library of asyncronous distributed evolutionary algorithms',
       author='Nathaniel J. Rodriguez',
       packages=['asyncevo'],

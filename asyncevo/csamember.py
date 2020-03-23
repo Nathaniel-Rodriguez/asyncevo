@@ -1,4 +1,4 @@
-__all__ = ['CSAMember']
+__all__ = ['CSAMember', 'DiagnosticCSAMember']
 
 
 import numpy as np
@@ -68,8 +68,8 @@ class CSAMember(BaseMember):
         raise NotImplementedError
 
     @property
-    def sigma(self):
-        return self._global_sigma
+    def data(self):
+        return None
 
     def appropriate_lineage(self, lineage: CSALineage):
         """
@@ -180,3 +180,44 @@ class CSAMember(BaseMember):
 
         return random_slices(rng, len(self._table),
                              len(self._x), self._max_table_step)
+
+
+class DiagnosticCSAMember(CSAMember):
+    """
+    This diagnostic class adds a data property which returns five indicators
+    of the CSA member:
+        local_sigma - the mean abs value of the local component of the step-size update.
+        global_sigma - the value of the global component of the step-size update.
+        abs_sigma - the mean of the absolute values of the sigma vector.
+        abs_path - the mean of the absolute values of the path vector. This is
+            most closely related to the local component of the step-size updated.
+        path_norm - the norm of the path vector. This is most closely related
+            to the global component of the step-size update.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def data(self):
+        np.fabs(self._path, out=self._path_buffer)
+        abs_path = np.mean(self._path_buffer)
+        path_norm = np.linalg.norm(self._path)
+        np.fabs(self._sigma, out=self._path_buffer)
+        abs_sigma = np.mean(self._path_buffer)
+
+        # generate the local sigma component of the step size update
+        self._path_buffer[:] = self._path[:]
+        np.fabs(self._path_buffer, out=self._path_buffer)
+        np.divide(self._path_buffer, self._abs_norm_factor, out=self._path_buffer)
+        np.subtract(self._path_buffer, 1, out=self._path_buffer)
+        np.multiply(1. / self._adaptation_precision,
+                    self._path_buffer, out=self._path_buffer)
+        np.exp(self._path_buffer, out=self._path_buffer)
+        np.fabs(self._path_buffer, out=self._path_buffer)
+        local_sigma = np.mean(self._path_buffer)
+
+        return {'local_sigma': local_sigma,
+                'global_sigma': self._global_sigma,
+                'abs_sigma': abs_sigma,
+                'abs_path': abs_path,
+                'path_norm': path_norm}

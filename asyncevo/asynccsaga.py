@@ -51,11 +51,11 @@ def dispatch_csa_work(fitness_function: Union[Callable[[CSAMember], float],
     member.appropriate_lineage(lineage)
     if take_member:
         return fitness_function(member, **fitness_kwargs),\
-               lineage, member_id, member.sigma
+               lineage, member_id, member.data
 
     else:
         return fitness_function(member.parameters, **fitness_kwargs),\
-               lineage, member_id, member.sigma
+               lineage, member_id, member.data
 
 
 class AsyncCSAGa:
@@ -84,6 +84,29 @@ class AsyncCSAGa:
                  save_every: int = None,
                  *args,
                  **kwargs):
+        """
+        Let n == the number of dimensions of the state.
+
+        :param initial_state: np.ndarray
+        :param initial_sigma: np.ndarray
+        :param population_size: int
+        :param scheduler: Scheduler
+        :param global_seed: int
+        :param path_memory: a scalar between 0 and 1, determines memory of
+            the evolutionary path. A value closers to 1 means shorter memory.
+            As n increases a better scaling is 1/(2*n) rather than 1/sqrt(n).
+            (default: sqrt(pop size / (n + pop size)))
+        :param adaptation_speed: damping parameter on global path contribution
+            to sigma. (default: 1 + sqrt(pop size / n))
+        :param adaptation_precision: damping parameter on local path contribution
+            to sigma. (default: 3n)
+        :param table_size: int = 20000000
+        :param max_table_step: int = 5
+        :param member_type=CSAMember
+        :param member_type_kwargs: Dict = None
+        :param save_filename: Path = None
+        :param save_every: int = None
+        """
 
         if member_type_kwargs is None:
             member_type_kwargs = {}
@@ -118,7 +141,7 @@ class AsyncCSAGa:
         self._selection_probabilities = [self._linearly_scaled_member_rank(i)
                                          for i in range(self._population_size)]
         self._fitness_history = kwargs.get('history', [])
-        self._sigma_history = kwargs.get('sigma_history', [])
+        self._data_history = kwargs.get('data_history', [])
         self._rng = Random(self._global_seed)
         self._population = kwargs.get('population', self._initialize())
         self._table_seed = kwargs.get('table_seed', self._make_seed())
@@ -162,7 +185,7 @@ class AsyncCSAGa:
                    save_every,
                    population=file_contents['population'],
                    history=file_contents['history'],
-                   sigma_history=file_contents['sigma_history'],
+                   data_history=file_contents['data_history'],
                    table_seed=file_contents['table_seed'],
                    from_file=True)
 
@@ -214,8 +237,8 @@ class AsyncCSAGa:
 
             # wait for initial batch to complete and fill initial population
             for completed_job in Scheduler.as_completed(initial_batch):
-                fitness, lineage, index, sigma = completed_job.result()
-                self._set_initial(lineage, fitness, sigma)
+                fitness, lineage, index, data = completed_job.result()
+                self._set_initial(lineage, fitness, data)
 
         # submit jobs to all workers or till num iterations is saturated
         jobs = []
@@ -231,10 +254,10 @@ class AsyncCSAGa:
         # iterate ga until num_iterations reached
         working_batch = Scheduler.as_completed(jobs)
         for completed_job in working_batch:
-            fitness, lineage, index, sigma = completed_job.result()
-            self._replacement(lineage, fitness, sigma)
+            fitness, lineage, index, data = completed_job.result()
+            self._replacement(lineage, fitness, data)
             self._update_fitness_history()
-            self._update_sigma_history()
+            self._update_data_history()
             if (self._save_filename is not None) and \
                     (self._step % self._save_every == 0):
                 self.save_population(self._save_filename)
@@ -273,7 +296,7 @@ class AsyncCSAGa:
         """
         return [{'lineage': CSALineage(self._make_seed()),
                  'fitness': None,
-                 'sigma': None}
+                 'data': None}
                 for _ in range(self._population_size)]
 
     def _selection(self) -> CSALineage:
@@ -298,13 +321,13 @@ class AsyncCSAGa:
                                  for pop in self._population])
         return mutant
 
-    def _replacement(self, lineage: CSALineage, fitness: float, sigma: float):
+    def _replacement(self, lineage: CSALineage, fitness: float, data: Dict):
         """
         Worst replacement. Given a lineage, if the given lineage is better than
         the worst population neighbor, replace that member in the population.
         :param lineage: a new lineage to check for replacement
         :param fitness: fitness of lineage
-        :param sigma: the approx magnitude of the step size at time of eval
+        :param data: arbitrary data from member in the form of a dict
         """
         # find lowest fitness pop and then replace
         weakest_member = None
@@ -317,20 +340,20 @@ class AsyncCSAGa:
         if fitness > lowest_fitness and weakest_member is not None:
             self._population[weakest_member]['lineage'] = lineage
             self._population[weakest_member]['fitness'] = fitness
-            self._population[weakest_member]['sigma'] = sigma
+            self._population[weakest_member]['data'] = data
 
-    def _set_initial(self, lineage: CSALineage, fitness: float, sigma: float):
+    def _set_initial(self, lineage: CSALineage, fitness: float, data: Dict):
         """
         Helps initialize the population with its first members.
         :param lineage: a lineage
         :param fitness: a fitness
-        :param sigma: the approx magnitude of the step size at time of eval
+        :param data: arbitrary data from member in the form of a dict
         """
         is_set = False
         for pop in self._population:
             if pop['lineage'] == lineage:
                 pop['fitness'] = fitness
-                pop['sigma'] = sigma
+                pop['data'] = data
                 is_set = True
 
         if not is_set:
@@ -344,13 +367,13 @@ class AsyncCSAGa:
                                       for pop in self._population
                                       if pop['fitness'] is not None])
 
-    def _update_sigma_history(self):
+    def _update_data_history(self):
         """
         Updates the internal record of the global step size for the population.
         """
-        self._sigma_history.append([pop['sigma']
-                                    for pop in self._population
-                                    if pop['sigma'] is not None])
+        self._data_history.append([pop['data']
+                                   for pop in self._population
+                                   if pop['data'] is not None])
 
     def _linearly_scaled_member_rank(self, cost_index):
         """
@@ -370,7 +393,7 @@ class AsyncCSAGa:
         pickled. The data layout is follows:
 
             {
-             'population': List[{'lineage': Lineage, 'fitness': float}],
+             'population': List[{'lineage': Lineage, 'fitness': float, 'data': Dict}],
              'initial_state': np.ndarray,
              'initial_sigma': np.ndarray,
              'path_memory': float,
@@ -396,5 +419,5 @@ class AsyncCSAGa:
             'table_size': self._table_size,
             'max_table_step': self._max_table_step,
             'history': self._fitness_history,
-            'sigma_history': self._sigma_history
+            'data_history': self._data_history
         }, filename)
