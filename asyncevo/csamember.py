@@ -184,8 +184,9 @@ class CSAMember(BaseMember):
 
 class DiagnosticCSAMember(CSAMember):
     """
-    This diagnostic class adds a data property which returns four indicators
+    This diagnostic class adds a data property which returns five indicators
     of the CSA member:
+        local_sigma - the mean abs value of the local component of the step-size update.
         global_sigma - the value of the global component of the step-size update.
         abs_sigma - the mean of the absolute values of the sigma vector.
         abs_path - the mean of the absolute values of the path vector. This is
@@ -203,7 +204,20 @@ class DiagnosticCSAMember(CSAMember):
         path_norm = np.linalg.norm(self._path)
         np.fabs(self._sigma, out=self._path_buffer)
         abs_sigma = np.mean(self._path_buffer)
-        return {'global_sigma': self._global_sigma,
+
+        # generate the local sigma component of the step size update
+        self._path_buffer[:] = self._path[:]
+        np.fabs(self._path_buffer, out=self._path_buffer)
+        np.divide(self._path_buffer, self._abs_norm_factor, out=self._path_buffer)
+        np.subtract(self._path_buffer, 1, out=self._path_buffer)
+        np.multiply(1. / self._adaptation_precision,
+                    self._path_buffer, out=self._path_buffer)
+        np.exp(self._path_buffer, out=self._path_buffer)
+        np.fabs(self._path_buffer, out=self._path_buffer)
+        local_sigma = np.mean(self._path_buffer)
+
+        return {'local_sigma': local_sigma,
+                'global_sigma': self._global_sigma,
                 'abs_sigma': abs_sigma,
                 'abs_path': abs_path,
                 'path_norm': path_norm}
