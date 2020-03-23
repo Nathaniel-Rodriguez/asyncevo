@@ -84,6 +84,27 @@ class AsyncCSAGa:
                  save_every: int = None,
                  *args,
                  **kwargs):
+        """
+        Let n == the number of dimensions of the state.
+
+        :param initial_state: np.ndarray
+        :param initial_sigma: np.ndarray
+        :param population_size: int
+        :param scheduler: Scheduler
+        :param global_seed: int
+        :param path_memory: a scalar between 0 and 1, determines memory of
+            the evolutionary path.
+        :param adaptation_speed: damping parameter on global path contribution
+            to sigma. (default: 1 + sqrt(pop size / n))
+        :param adaptation_precision: damping parameter on local path contribution
+            to sigma. (default: 3n)
+        :param table_size: int = 20000000
+        :param max_table_step: int = 5
+        :param member_type=CSAMember
+        :param member_type_kwargs: Dict = None
+        :param save_filename: Path = None
+        :param save_every: int = None
+        """
 
         if member_type_kwargs is None:
             member_type_kwargs = {}
