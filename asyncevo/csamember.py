@@ -1,4 +1,4 @@
-__all__ = ['CSAMember']
+__all__ = ['CSAMember', 'DiagnosticCSAMember']
 
 
 import numpy as np
@@ -68,8 +68,8 @@ class CSAMember(BaseMember):
         raise NotImplementedError
 
     @property
-    def sigma(self):
-        return self._global_sigma
+    def data(self):
+        return None
 
     def appropriate_lineage(self, lineage: CSALineage):
         """
@@ -180,3 +180,20 @@ class CSAMember(BaseMember):
 
         return random_slices(rng, len(self._table),
                              len(self._x), self._max_table_step)
+
+
+class DiagnosticCSAMember(CSAMember):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def data(self):
+        np.fabs(self._path, out=self._path_buffer)
+        abs_path = np.mean(self._path_buffer)
+        path_norm = np.linalg.norm(self._path)
+        np.fabs(self._sigma, out=self._path_buffer)
+        abs_sigma = np.mean(self._path_buffer)
+        return {'global_sigma': self._global_sigma,
+                'abs_sigma': abs_sigma,
+                'abs_path': abs_path,
+                'path_norm': path_norm}
