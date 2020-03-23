@@ -66,7 +66,7 @@ def main():
                         max_table_step=1,
                         member_type=DiagnosticCSAMember,
                         save_filename=Path("test.csaga"))
-        ga.run(sphere, 300, take_member=False)
+        ga.run(sphere, 1000, take_member=False)
 
 
 if __name__ == "__main__":
