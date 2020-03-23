@@ -93,7 +93,9 @@ class AsyncCSAGa:
         :param scheduler: Scheduler
         :param global_seed: int
         :param path_memory: a scalar between 0 and 1, determines memory of
-            the evolutionary path. (default: sqrt(pop size / (n + pop size)))
+            the evolutionary path. A value closers to 1 means shorter memory.
+            As n increases a better scaling is 1/(2*n) rather than 1/sqrt(n).
+            (default: sqrt(pop size / (n + pop size)))
         :param adaptation_speed: damping parameter on global path contribution
             to sigma. (default: 1 + sqrt(pop size / n))
         :param adaptation_precision: damping parameter on local path contribution
