@@ -183,6 +183,16 @@ class CSAMember(BaseMember):
 
 
 class DiagnosticCSAMember(CSAMember):
+    """
+    This diagnostic class adds a data property which returns four indicators
+    of the CSA member:
+        global_sigma - the value of the global component of the step-size update.
+        abs_sigma - the mean of the absolute values of the sigma vector.
+        abs_path - the mean of the absolute values of the path vector. This is
+            most closely related to the local component of the step-size updated.
+        path_norm - the norm of the path vector. This is most closely related
+            to the global component of the step-size update.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
