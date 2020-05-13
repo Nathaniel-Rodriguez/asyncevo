@@ -1,11 +1,11 @@
-__all__ = ['AdaptiveSimulatedAnnealing']
+__all__ = ['AdaptiveCoolingSchedule']
 
 
 import math
 import numpy as np
 
 
-class AdaptiveSimulatedAnnealing:
+class AdaptiveCoolingSchedule:
     """
     Implements a cooling schedule based on the adaptive schedule developed by:
     Huang, M.D., Romeo, F., Sangiovanni-Vincentelli, A.L., 1986.
@@ -64,6 +64,22 @@ class AdaptiveSimulatedAnnealing:
         self._var_buffer = np.zeros(max_estimate_window)  # pre-allocated buffer
         self._sample_index = max_estimate_window  # index for first valid sample
 
+    @property
+    def temperature(self):
+        return self._tc
+
+    @temperature.setter
+    def temperature(self, value):
+        raise NotImplementedError
+
+    @property
+    def log(self):
+        return self._t_log
+
+    @log.setter
+    def log(self, value):
+        raise NotImplementedError
+
     def step(self, sample_t: float, sample_e: float) -> float:
         """
         Steps the cooling schedule.
@@ -83,10 +99,12 @@ class AdaptiveSimulatedAnnealing:
         # wait to update the temperature until enough samples are accumulated
         if self._step_count < self._hold_window:
             self._step_count += 1
+            self._t_log.append(self._tc)
             return self._tc
         elif self._tc >= self._tmin:
             return self._update_temperature()
         else:
+            self._t_log.append(self._tc)
             return self._tc
 
     def _update_temperature(self) -> float:
@@ -111,6 +129,6 @@ class AdaptiveSimulatedAnnealing:
         ) / self._weights[self._sample_index:].sum())
 
         # update temperature
-        t_new = self._tc * math.exp(-self._g * self._tc / weighted_e_std)
-        self._t_log.append(t_new)
-        return t_new
+        self._tc = self._tc * math.exp(-self._g * self._tc / weighted_e_std)
+        self._t_log.append(self._tc)
+        return self._tc
