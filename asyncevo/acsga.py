@@ -6,12 +6,13 @@ from math import inf
 from typing import Dict
 from typing import Callable
 from typing import List
+from typing import Union
 from copy import deepcopy
 from pathlib import Path
 from random import Random
 from asyncevo import Member
 from asyncevo import Scheduler
-from asyncevo import ACSLineage
+from asyncevo import Lineage
 from asyncevo import DEFAULT_TYPE
 from asyncevo import manhattan_distance
 from asyncevo import initialize_member
@@ -33,7 +34,6 @@ class ACSGa:
                  population_size: int,
                  scheduler: Scheduler,
                  global_seed: int,
-                 sigma: float,
                  cooling_schedule: AdaptiveCoolingSchedule,
                  table_size: int = 20000000,
                  max_table_step: int = 5,
@@ -52,8 +52,8 @@ class ACSGa:
         self._scheduler = scheduler
         self._global_seed = global_seed
         self._step = 0
-        self._sigma0 = sigma
-        self._sigma = sigma
+        self._sigma0 = cooling_schedule.temperature
+        self._sigma = cooling_schedule.temperature
         self._cooling_schedule = cooling_schedule
         self._table_size = table_size
         self._max_table_step = max_table_step
@@ -85,14 +85,12 @@ class ACSGa:
 
     @classmethod
     def from_file(cls,
-                  filename: Path,
+                  filename: Union[Path, str],
                   scheduler: Scheduler,
                   global_seed: int,
-                  sigma: float,
-                  cooling_schedule: AdaptiveCoolingSchedule,
                   member_type=Member,
                   member_type_kwargs: Dict = None,
-                  save_filename: Path = None,
+                  save_filename: Union[Path, str] = None,
                   save_every: int = None,
                   replacement_strategy: str = "crowding"):
         file_contents = load(filename)
@@ -100,18 +98,17 @@ class ACSGa:
                    len(file_contents['population']),
                    scheduler,
                    global_seed,
-                   sigma,
-                   cooling_schedule,
-                   file_contents['table_size'],
-                   file_contents['max_table_step'],
-                   member_type,
-                   member_type_kwargs,
-                   save_filename,
-                   save_every,
-                   replacement_strategy,
+                   table_size=file_contents['table_size'],
+                   max_table_step=file_contents['max_table_step'],
+                   member_type=member_type,
+                   member_type_kwargs=member_type_kwargs,
+                   save_filename=save_filename,
+                   save_every=save_every,
+                   replacement_strategy=replacement_strategy,
                    population=file_contents['population'],
                    history=file_contents['history'],
                    table_seed=file_contents['table_seed'],
+                   cooling_schedule=file_contents['cooling_schedule'],
                    from_file=True)
 
     def run(self, fitness_function: Callable[[np.ndarray], float],
@@ -180,7 +177,7 @@ class ACSGa:
         working_batch = Scheduler.as_completed(jobs)
         for completed_job in working_batch:
             fitness, lineage, index = completed_job.result()
-            self._anneal(fitness, lineage[-1]['temperature'])
+            self._anneal(fitness, lineage[-1]['sigma'])
             self._replacement(lineage, fitness)
             self._update_fitness_history()
             if (self._save_filename is not None) and \
@@ -219,12 +216,11 @@ class ACSGa:
         Generates the initial population of lineages with None fitness values.
         :return: a list of dictionaries with keys 'lineage' and 'fitness'
         """
-        return [{'lineage': ACSLineage(self._make_seed(), self._sigma,
-                                       self._cooling_schedule.temperature),
+        return [{'lineage': Lineage(self._make_seed(), self._sigma),
                  'fitness': None}
                 for _ in range(self._population_size)]
 
-    def _selection(self) -> ACSLineage:
+    def _selection(self) -> Lineage:
         """
         Pick lineage at random from population based on ranked fitness
         :return: a lineage.
@@ -232,7 +228,7 @@ class ACSGa:
         return self._population[self._rng.choices(self._fitness_sorted_indices(),
                                 weights=self._selection_probabilities)[0]]['lineage']
 
-    def _mutation(self, lineage: ACSLineage) -> ACSLineage:
+    def _mutation(self, lineage: Lineage) -> Lineage:
         """
         Append a mutation operation onto a lineage in the form of a seed.
         It also appends the current sigma to the lineage.
@@ -240,11 +236,10 @@ class ACSGa:
         :return: a new lineage.
         """
         mutant = deepcopy(lineage)
-        mutant.add_history(self._make_seed(), self._sigma,
-                           self._cooling_schedule.temperature)
+        mutant.add_history(self._make_seed(), self._sigma)
         return mutant
 
-    def _crowding(self, lineage: ACSLineage, fitness: float):
+    def _crowding(self, lineage: Lineage, fitness: float):
         """
         Crowding replacement. Given a lineage, express the member and find its
         manhattan distance to the parameters of other lineages in the
@@ -287,7 +282,7 @@ class ACSGa:
             self._population[closest_member_index] = {'lineage': lineage,
                                                       'fitness': fitness}
 
-    def _worst(self, lineage: ACSLineage, fitness: float):
+    def _worst(self, lineage: Lineage, fitness: float):
         """
         Worst replacement. Given a lineage, if the given lineage is better than
         the worst population neighbor, replace that member in the population.
@@ -310,9 +305,12 @@ class ACSGa:
         """
         Applies annealing to sigma.
         """
-        self._cooling_schedule.step(sample_temperature, -sample_fitness)
+        # self._sigma = self._sigma * self._cooling_schedule.step(
+        #     sample_temperature, -sample_fitness)
+        self._sigma = self._cooling_schedule.step(
+            sample_temperature, -sample_fitness)
 
-    def _set_initial(self, lineage: ACSLineage, fitness: float):
+    def _set_initial(self, lineage: Lineage, fitness: float):
         """
         Helps initialize the population with its first members.
         :param lineage: a lineage
@@ -353,7 +351,7 @@ class ACSGa:
         pickled. The data layout is follows:
 
             {
-             'population': List[{'lineage': ACSLineage, 'fitness': float}],
+             'population': List[{'lineage': Lineage, 'fitness': float}],
              'initial_state': np.ndarray,
              'table_seed': int,
              'table_size': int,
