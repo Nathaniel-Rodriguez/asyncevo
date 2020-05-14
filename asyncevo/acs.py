@@ -36,13 +36,15 @@ class AdaptiveCoolingSchedule:
         """
         :param t0: initial temperature
         :param cooling_factor: determines how quickly the cooling rate can
-        change. A low value means fast change, while a high value means
-        changes will be slow. Value is bound between [0,1].
+        change. A high value means fast change, while a low value means
+        changes will be slow. Value is bound between [0,inf].
         :param tmin: the minimum allowed temperature. Default 0.0
         :param max_estimate_window: the maximum allowed history to record.
         :param decay_factor: how strongly to penalize energy contributions from
         temperatures different from the current temperature when estimating
-        the heat capacity.
+        the heat capacity. Larger values (>1) more strongly weigh distant
+        temperatures, while smaller values (<1) more strongly weigh
+        current temperatures.
         :param hold_window: how many initial steps to wait before updating the
         temperature. Since one sample is gained each step, this equates to the
         number of samples that will be used to generate the first heat
@@ -58,6 +60,7 @@ class AdaptiveCoolingSchedule:
         self._hold_window = hold_window  # how long to wait till t updates
         self._step_count = 0
 
+        self._avg_e_history = []  # history of <e> for each change in t
         self._t_history = np.zeros(max_estimate_window)  # sample temp history
         self._e_history = np.zeros(max_estimate_window)  # sample energy history
         self._weights = np.zeros(max_estimate_window)  # sample weights
@@ -119,6 +122,9 @@ class AdaptiveCoolingSchedule:
         # calculate energy standard deviation
         weighted_e_mean = np.average(self._e_history[self._sample_index:],
                                      weights=self._weights[self._sample_index:])
+        if len(self._avg_e_history) == 0:
+            self._avg_e_history.append(weighted_e_mean)
+        self._avg_e_history.append(weighted_e_mean)
         weighted_e_std = math.sqrt(np.average(
             np.square(
                 np.subtract(self._e_history[self._sample_index:],
@@ -129,6 +135,10 @@ class AdaptiveCoolingSchedule:
         ) / self._weights[self._sample_index:].sum())
 
         # update temperature
-        self._tc = self._tc * math.exp(-self._g * self._tc / weighted_e_std)
+        if not math.isclose(weighted_e_std, 0.0, abs_tol=1e-15):
+            self._tc = self._tc * math.exp(-self._g * self._tc / weighted_e_std)
+
+        else:
+            self._tc = self._tc
         self._t_log.append(self._tc)
         return self._tc
