@@ -6,8 +6,9 @@
 # rank 0 is dedicated to the scheduler
 # ranks 2+ are dedicated to workers
 from asyncevo import Scheduler
-from asyncevo import AsyncGa
+from asyncevo import ACSGa
 from asyncevo import Member
+from asyncevo import AdaptiveCoolingSchedule
 import numpy as np
 from math import inf
 from pathlib import Path
@@ -57,43 +58,37 @@ def main():
     # make the scheduler first
     with Scheduler({'nanny': True, 'interface': 'lo'}) as mpi_scheduler:
         # create and run GA
-        # ga = AsyncGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
-        #              population_size=5,
-        #              scheduler=mpi_scheduler,
-        #              global_seed=96879,
-        #              sigma=5.0,
-        #              cooling_factor=0.996,
-        #              annealing_start=0,
-        #              annealing_stop=inf,
-        #              table_size=20000,
-        #              max_table_step=1,
-        #              member_type=Member,
-        #              save_filename=Path("test.asyncga"),
-        #              save_every=1000)
+        # acs = AdaptiveCoolingSchedule(1, 0.2, 0, 10000, 1.0, 20)
+        # ga = ACSGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
+        #            population_size=5,
+        #            scheduler=mpi_scheduler,
+        #            global_seed=96879,
+        #            cooling_schedule=acs,
+        #            table_size=20000,
+        #            max_table_step=1,
+        #            member_type=Member,
+        #            save_filename=Path("test.acsga"),
+        #            save_every=1000)
         # ga.run(sphere, 350, take_member=False)
 
-        ga = AsyncGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
-                     population_size=5,
-                     scheduler=mpi_scheduler,
-                     global_seed=96879,
-                     sigma=5.0,
-                     cooling_factor=0.996,
-                     annealing_start=0,
-                     annealing_stop=inf,
-                     table_size=20000,
-                     max_table_step=1,
-                     member_type=Member,
-                     save_filename=Path("test.asyncga"),
-                     save_every=1000)
-        ga.run(rosenbrock, 350, take_member=False)
+        acs = AdaptiveCoolingSchedule(5.0, 100.0, 0.0, 500, 1.0, 50)  # 20
+        ga = ACSGa(initial_state=np.array([0.4, 0.3, -0.25, 0.01]),
+                   population_size=5,
+                   scheduler=mpi_scheduler,
+                   global_seed=96879,
+                   cooling_schedule=acs,
+                   table_size=20000,
+                   max_table_step=1,
+                   member_type=Member,
+                   save_filename=Path("test.acsga"),
+                   save_every=1000)
+        ga.run(rosenbrock, 2000, take_member=False)
 
         # load pop from file and continue
-        # ga = AsyncGa.from_file("test.asyncga",
-        #                        scheduler=mpi_scheduler,
-        #                        global_seed=432,
-        #                        sigma=0.1,
-        #                        cooling_factor=1.0,
-        #                        save_filename="test.asyncga")
+        # ga = ACSGa.from_file("test.acsga",
+        #                      scheduler=mpi_scheduler,
+        #                      global_seed=432,
+        #                      save_filename="test.acsga")
         # ga.run(sphere, 50, take_member=False)
 
 
