@@ -6,6 +6,7 @@ from typing import Dict
 from time import sleep
 from distributed import Client
 from distributed import as_completed
+from distributed import wait
 from abc import ABC, abstractmethod
 
 
@@ -43,6 +44,11 @@ class BaseScheduler(ABC):
     @staticmethod
     @abstractmethod
     def as_completed(*args, **kwargs):
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def wait(*args, **kwargs):
         raise NotImplementedError
 
 
@@ -175,6 +181,10 @@ class Scheduler(BaseScheduler):
     def as_completed(*args, **kwargs):
         return as_completed(*args, **kwargs)
 
+    @staticmethod
+    def wait(*args, **kwargs):
+        return wait(*args, **kwargs)
+
 
 class LocalScheduler(BaseScheduler):
     """
@@ -233,3 +243,7 @@ class LocalScheduler(BaseScheduler):
     @staticmethod
     def as_completed(*args, **kwargs):
         return as_completed(*args, **kwargs)
+
+    @staticmethod
+    def wait(*args, **kwargs):
+        return wait(*args, **kwargs)
