@@ -183,6 +183,8 @@ class LocalScheduler(BaseScheduler):
     def __init__(self, initialization_args: Dict = None,
                  client_args: Dict = None):
         """
+        :param initialization_args: arguments for LocalCluster
+        :param client_args: arguments for Client
         """
         if initialization_args is None:
             initialization_args = {}
