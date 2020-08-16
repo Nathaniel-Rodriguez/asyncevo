@@ -11,3 +11,4 @@ from asyncevo.csamember import *
 from asyncevo.asynccsaga import *
 from asyncevo.acs import *
 from asyncevo.acsga import *
+from asyncevo.generationalga import *
