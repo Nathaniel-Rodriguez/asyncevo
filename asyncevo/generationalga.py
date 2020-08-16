@@ -107,8 +107,6 @@ class GenerationalGa:
                                    'table_size': self._table_size,
                                    'max_table_step': self._max_table_step}
         self._member_type_kwargs.update(self._member_parameters)
-        self._member_buffer1 = Member(**self._member_parameters)
-        self._member_buffer2 = Member(**self._member_parameters)
 
     @classmethod
     def from_file(cls,
@@ -197,16 +195,16 @@ class GenerationalGa:
         # submit jobs to all workers
         for index in range(num_iterations):
             self._step += 1
-            self._anneal()
             self._selection()
+            self._anneal()
             self._mutation()
             generation_batch = [
                 self._scheduler.client.submit(
                     dispatch_work, fitness_function,
                     self._population[pop]['lineage'],
-                    members[index], index, fitness_kwargs,
+                    members[i], i, fitness_kwargs,
                     take_member=take_member,
-                    workers=[workers[index]])
+                    workers=[workers[i]])
                 for i, pop_group in enumerate(
                     split_work(list(range(self._population_size)), num_workers))
                 for pop in pop_group
@@ -256,7 +254,8 @@ class GenerationalGa:
         chosen = self._rng.choices(self._fitness_sorted_indices(),
                                    weights=self._selection_probabilities,
                                    k=self._population_size)
-        self._population = [self._population[index] for index in chosen]
+        self._population = [deepcopy(self._population[index])
+                            for index in chosen]
 
     def _mutation(self):
         """
