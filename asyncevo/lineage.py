@@ -37,3 +37,5 @@ class Lineage(Sequence):
 
     def __str__(self):
         return str(self._lineage)
+
+    __repr__ = __str__
