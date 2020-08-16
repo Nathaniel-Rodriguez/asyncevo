@@ -1,4 +1,4 @@
-__all__ = ['Scheduler']
+__all__ = ['BaseScheduler', 'Scheduler', 'LocalScheduler']
 
 
 from typing import List
@@ -6,9 +6,53 @@ from typing import Dict
 from time import sleep
 from distributed import Client
 from distributed import as_completed
+from distributed import wait
+from abc import ABC, abstractmethod
 
 
-class Scheduler:
+class BaseScheduler(ABC):
+    @abstractmethod
+    def __enter__(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def client(self):
+        raise NotImplementedError
+
+    @client.setter
+    @abstractmethod
+    def client(self, value):
+        raise NotImplementedError
+
+    @abstractmethod
+    def wait_on_workers(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def num_workers(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_worker_names(self):
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def as_completed(*args, **kwargs):
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def wait(*args, **kwargs):
+        raise NotImplementedError
+
+
+class Scheduler(BaseScheduler):
     """
     A wrapper around dask-mpi.
     """
@@ -136,3 +180,70 @@ class Scheduler:
     @staticmethod
     def as_completed(*args, **kwargs):
         return as_completed(*args, **kwargs)
+
+    @staticmethod
+    def wait(*args, **kwargs):
+        return wait(*args, **kwargs)
+
+
+class LocalScheduler(BaseScheduler):
+    """
+    A wrapper around Dask LocalCluster & client
+    """
+    def __init__(self, initialization_args: Dict = None,
+                 client_args: Dict = None):
+        """
+        :param initialization_args: arguments for LocalCluster
+        :param client_args: arguments for Client
+        """
+        if initialization_args is None:
+            initialization_args = {}
+
+        if client_args is None:
+            client_args = {}
+
+        from dask.distributed import Client, LocalCluster
+        self._cluster = LocalCluster(**initialization_args)
+        self._client = Client(self._cluster, **client_args)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self._client.shutdown()
+
+    @property
+    def client(self):
+        return self._client
+
+    @client.setter
+    def client(self, value):
+        raise NotImplementedError
+
+    def wait_on_workers(self):
+        """
+        Sleeps for a few seconds to wait for workers to connect. If time isn't
+        given then not all workers maybe accounted for by the time one of the
+        other methods is called.
+        """
+        sleep(5)
+
+    def num_workers(self) -> int:
+        """
+        :return: the number of known workers.
+        """
+        return len(self._client.scheduler_info()['workers'])
+
+    def get_worker_names(self) -> List[str]:
+        """
+        :return: return list of worker names
+        """
+        return list(self._client.scheduler_info()['workers'].keys())
+
+    @staticmethod
+    def as_completed(*args, **kwargs):
+        return as_completed(*args, **kwargs)
+
+    @staticmethod
+    def wait(*args, **kwargs):
+        return wait(*args, **kwargs)
