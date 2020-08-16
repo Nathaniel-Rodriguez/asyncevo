@@ -65,14 +65,14 @@ def main():
             save_every=1000)
         ga.run(sphere, 30, take_member=False)
 
-        # # load pop from file and continue
-        # ga = GenerationalGa.from_file("test.ga",
-        #                               scheduler=local_scheduler,
-        #                               global_seed=432,
-        #                               sigma=0.1,
-        #                               cooling_factor=1.0,
-        #                               save_filename="test.ga")
-        # ga.run(rosenbrock, 10, take_member=False)
+        # load pop from file and continue
+        ga = GenerationalGa.from_file("test.ga",
+                                      scheduler=local_scheduler,
+                                      global_seed=432,
+                                      sigma=0.01,
+                                      cooling_factor=1.0,
+                                      save_filename="test.ga")
+        ga.run(sphere, 10, take_member=False)
 
 
 if __name__ == "__main__":
